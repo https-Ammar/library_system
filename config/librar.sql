@@ -1,4 +1,4 @@
-CREATE DATABASE IF NOT EXISTS LibraryManagement;
+CREATE DATABASE IF NOT EXISTS LibraryManagement CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE LibraryManagement;
 
@@ -97,6 +97,22 @@ CREATE TABLE Users (
     deleted_at TIMESTAMP NULL,
     INDEX idx_deleted_at (deleted_at)
 );
+
+CREATE TABLE usersadmin (
+    id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) DEFAULT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+INSERT INTO
+    usersadmin (name, email, password)
+VALUES (
+        'Admin User',
+        'admin@example.com',
+        '$2y$10$mh5N4FzEJvRzVwHcGfSc/eMPiRJG/Y3vZ2TzUb4kAs7pb9pc.Mc3m'
+    );
 
 CREATE TABLE BookReservations (
     reservation_id INT AUTO_INCREMENT PRIMARY KEY,
