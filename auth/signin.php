@@ -19,9 +19,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($username_email) || empty($password)) {
         $message = "يرجى ملء جميع الحقول.";
     } else {
-        $stmt = $conn->prepare("SELECT user_id, username, password_hash, role FROM Users WHERE (username = ? OR email = ?) AND deleted_at IS NULL LIMIT 1");
+        $stmt = $mysqli->prepare("SELECT user_id, username, password_hash, role FROM Users WHERE (username = ? OR email = ?) AND deleted_at IS NULL LIMIT 1");
         if ($stmt === false) {
-            die('Prepare failed: ' . htmlspecialchars($conn->error));
+            die('Prepare failed: ' . htmlspecialchars($mysqli->error));
         }
         $stmt->bind_param("ss", $username_email, $username_email);
         $stmt->execute();

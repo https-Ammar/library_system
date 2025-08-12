@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $error_message = "Session expired. Please register again.";
             } else {
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
+                $stmt = $mysqli->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
                 if ($stmt) {
                     $stmt->bind_param("sss", $username, $email, $password_hash);
                     if ($stmt->execute()) {
@@ -48,7 +48,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $error_message = "Database error.";
                 }
             }
-            $conn->close();
+            $mysqli->close();
         }
     }
 }

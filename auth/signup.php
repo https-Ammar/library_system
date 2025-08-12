@@ -35,9 +35,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif ($password !== $confirm_password) {
         $message = "كلمات المرور غير متطابقة.";
     } else {
-        $stmt = $conn->prepare("SELECT COUNT(*) FROM Users WHERE username = ? OR email = ?");
+        $stmt = $mysqli->prepare("SELECT COUNT(*) FROM Users WHERE username = ? OR email = ?");
         if ($stmt === false) {
-            die('فشل التحضير: ' . htmlspecialchars($conn->error));
+            die('فشل التحضير: ' . htmlspecialchars($mysqli->error));
         }
 
         $stmt->bind_param("ss", $username, $email);

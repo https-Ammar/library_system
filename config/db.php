@@ -1,18 +1,11 @@
 <?php
-// إعدادات الاتصال
 $servername = "localhost";
 $username = "root";
 $password = "root";
 $dbname = "LibraryManagement";
-
-// إنشاء الاتصال
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// التحقق من الاتصال
-if ($conn->connect_error) {
-    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+$mysqli = new mysqli($servername, $username, $password, $dbname);
+if ($mysqli->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $mysqli->connect_error);
 }
-
-// ضبط ترميز الاتصال
-$conn->set_charset("utf8mb4");
+$mysqli->set_charset("utf8mb4");
 ?>

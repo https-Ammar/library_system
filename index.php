@@ -9,10 +9,10 @@ require_once './config/db.php';
 
 $today = date('Y-m-d');
 
-$result = $conn->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-$stmt = $conn->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status IN ('approved', 'returned')");
+$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status IN ('approved', 'returned')");
 $stmt->bind_param('s', $today);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
@@ -20,21 +20,21 @@ $stmt->fetch();
 $stmt->close();
 
 $history = [];
-$result = $conn->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status IN ('approved', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
+$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status IN ('approved', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
 while ($row = $result->fetch_assoc()) {
     $history[] = $row;
 }
 
-$result = $conn->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $conn->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status IN ('approved', 'returned')");
+$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status IN ('approved', 'returned')");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $conn->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY status");
+$result = $mysqli->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY status");
 $order_status_counts = [
     'pending' => 0,
     'approved' => 0,
@@ -45,17 +45,17 @@ while ($row = $result->fetch_assoc()) {
     $order_status_counts[$row['status']] = $row['count'];
 }
 
-$result = $conn->query("SELECT SUM(amount) AS total_expenses FROM Expenses WHERE deleted_at IS NULL");
+$result = $mysqli->query("SELECT SUM(amount) AS total_expenses FROM Expenses WHERE deleted_at IS NULL");
 $total_expenses = $result->fetch_assoc()['total_expenses'] ?? 0;
 
-$result = $conn->query("SELECT COUNT(*) AS total_students FROM Students WHERE deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS total_students FROM Students WHERE deleted_at IS NULL");
 $total_students = $result->fetch_assoc()['total_students'] ?? 0;
 
-$result = $conn->query("SELECT COUNT(*) AS total_users FROM Users WHERE deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE deleted_at IS NULL");
 $total_users = $result->fetch_assoc()['total_users'] ?? 0;
 
 $daily_records = [];
-$result = $conn->query("SELECT 
+$result = $mysqli->query("SELECT 
     br.reservation_id,
     s.name AS student_name,
     s.phone AS student_phone,
@@ -80,7 +80,7 @@ while ($row = $result->fetch_assoc()) {
 }
 
 $all_records = [];
-$result = $conn->query("SELECT 
+$result = $mysqli->query("SELECT 
     br.reservation_id,
     s.name AS student_name,
     s.phone AS student_phone,
@@ -506,10 +506,23 @@ while ($row = $result->fetch_assoc()) {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+
                         </div>
                     </div>
+
                 </div>
+
+                <br>
+                <div
+                    class=" text-center z-50 p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-l border-gray-200 dark:border-gray-800 rounded-tl-lg text-xs text-gray-600 dark:text-gray-400">
+                    <br>
+                    Developed by <span class="font-medium text-primary-600 dark:text-primary-400">eng - Ammar
+                        Ahmed</span> &copy;
+                    <span x-text="new Date().getFullYear()"></span>
+                </div>
+
             </main>
+
             <script defer src="./assets/js/bundle.js"></script>
         </div>
     </div>
