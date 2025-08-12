@@ -38,21 +38,21 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="menu-dropdown-item group" href="./pages/add_product.php"
+                                    <a class="menu-dropdown-item group" href="./pages/student.php"
                                         :class="page === 'marketing' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
-                                        Add Products
+                                        الطلاب
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="./pages/coupon.php" class="menu-dropdown-item group"
+                                    <a href="./pages/teachers.php" class="menu-dropdown-item group"
                                         :class="page === 'crm' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
-                                        Coupon
+                                        المدرسين
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="./customers/customers.php" class="menu-dropdown-item group"
+                                    <a href="./pages/grade.php" class="menu-dropdown-item group"
                                         :class="page === 'stocks' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
-                                        Customers
+                                        المراحل الدراسية
                                     </a>
                                 </li>
                                 <li>

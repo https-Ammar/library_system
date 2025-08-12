@@ -9,51 +9,40 @@ while ($row = $dates_result->fetch_assoc()) {
     $dates[] = $row['date'];
 }
 
-$selected_date = $_GET['date'] ?? '';
+$selected_date = $_GET['date'] ?? $today;
 $all_records = [];
 
-if (!empty($selected_date)) {
-    $stmt = $mysqli->prepare("SELECT 
-        br.reservation_id,
-        s.name AS student_name,
-        b.title AS book_title,
-        br.amount_paid,
-        br.status,
-        br.created_at
-    FROM BookReservations br
-    JOIN Students s ON br.student_id = s.student_id
-    JOIN Books b ON br.book_id = b.book_id
-    WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
-    ORDER BY br.created_at DESC");
-    $stmt->bind_param('s', $selected_date);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $all_records[] = $row;
-    }
-    $stmt->close();
-} else {
-    $result = $mysqli->query("SELECT 
-        br.reservation_id,
-        s.name AS student_name,
-        b.title AS book_title,
-        br.amount_paid,
-        br.status,
-        br.created_at
-    FROM BookReservations br
-    JOIN Students s ON br.student_id = s.student_id
-    JOIN Books b ON br.book_id = b.book_id
-    WHERE br.deleted_at IS NULL
-    ORDER BY br.created_at DESC");
-    while ($row = $result->fetch_assoc()) {
-        $all_records[] = $row;
-    }
+$stmt = $mysqli->prepare("SELECT 
+    br.reservation_id,
+    s.name AS student_name,
+    s.phone AS student_phone,
+    g.name AS grade_name,
+    t.name AS teacher_name,
+    b.title AS book_title,
+    b.price AS book_price,
+    br.amount_paid,
+    (b.price - br.amount_paid) AS amount_due,
+    br.status,
+    br.created_at
+FROM BookReservations br
+JOIN Students s ON br.student_id = s.student_id
+JOIN Books b ON br.book_id = b.book_id
+LEFT JOIN Grades g ON s.grade_id = g.grade_id
+LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
+ORDER BY br.created_at DESC");
+$stmt->bind_param('s', $selected_date);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $all_records[] = $row;
 }
+$stmt->close();
 
-$today_orders = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL")->fetch_assoc()['today_orders'] ?? 0;
+$today_orders = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$selected_date' AND deleted_at IS NULL")->fetch_assoc()['today_orders'] ?? 0;
 
 $stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status IN ('approved', 'returned')");
-$stmt->bind_param('s', $today);
+$stmt->bind_param('s', $selected_date);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
 $stmt->fetch();
@@ -67,7 +56,7 @@ $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $mysqli->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY status");
+$result = $mysqli->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE DATE(created_at) = '$selected_date' AND deleted_at IS NULL GROUP BY status");
 $order_status_counts = [
     'pending' => 0,
     'approved' => 0,
@@ -252,17 +241,9 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                         <div class="px-6 py-4">
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">السجل الكامل</h3>
                             <p class="text-gray-500 dark:text-gray-400">
-                                <?php if (!empty($selected_date)): ?>
-                                    عرض الطلبات ليوم <?= $selected_date ?>
-                                <?php else: ?>
-                                    جميع الطلبات المسجلة في النظام
-                                <?php endif; ?>
+                                عرض الطلبات ليوم <?= $selected_date ?>
                             </p>
                             <div class="flex flex-wrap gap-2 mt-4 mb-6">
-                                <a href="history.php"
-                                    class="date-tab px-4 py-2 rounded-lg <?= empty($selected_date) ? 'active bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800' ?>">
-                                    الكل
-                                </a>
                                 <?php foreach ($dates as $date): ?>
                                     <a href="history.php?date=<?= $date ?>"
                                         class="date-tab px-4 py-2 rounded-lg <?= $selected_date == $date ? 'active bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800' ?>">
@@ -271,6 +252,7 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                 <?php endforeach; ?>
                             </div>
                         </div>
+
                         <div class="custom-scrollbar overflow-x-auto">
                             <table class="min-w-full">
                                 <thead>
@@ -283,16 +265,34 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                             اسم الطالب</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            رقم الهاتف</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            المرحلة</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            المدرس</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             اسم الكتاب</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            السعر</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             المبلغ المدفوع</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            المبلغ المتبقي</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             الحالة</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            التاريخ والوقت</th>
+                                            تاريخ الحجز</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            وقت الحجز</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -309,39 +309,63 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                                 </td>
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= $record['student_phone'] ?? 'غير متوفر' ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= $record['grade_name'] ?? 'غير محدد' ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= $record['teacher_name'] ?? 'غير محدد' ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?= $record['book_title'] ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= number_format($record['book_price'], 2) ?> ج.م
                                                 </td>
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?= number_format($record['amount_paid'], 2) ?> ج.م
                                                 </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= number_format($record['amount_due'], 2) ?> ج.م
+                                                </td>
                                                 <td class="px-6 py-4 text-left">
                                                     <?php
-                                                    $status_class = '';
-                                                    if ($record['status'] == 'approved') {
+                                                    $status = $record['status'];
+                                                    $status_class = 'bg-gray-50 text-gray-600 dark:bg-gray-500/15 dark:text-gray-500';
+
+                                                    if ($status == 'approved') {
                                                         $status_class = 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500';
-                                                    } elseif ($record['status'] == 'pending') {
+                                                    } elseif ($status == 'pending') {
                                                         $status_class = 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500';
-                                                    } elseif ($record['status'] == 'cancelled') {
+                                                    } elseif ($status == 'cancelled') {
                                                         $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
-                                                    } elseif ($record['status'] == 'returned') {
+                                                    } elseif ($status == 'returned') {
                                                         $status_class = 'bg-info-50 text-info-600 dark:bg-info-500/15 dark:text-info-500';
                                                     }
                                                     ?>
                                                     <span
-                                                        class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium">
-                                                        <?= $record['status'] ?>
-                                                    </span>
+                                                        class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium"><?= $status ?></span>
                                                 </td>
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                    <?= date('Y-m-d H:i', strtotime($record['created_at'])) ?>
+                                                    <?= date('Y-m-d', strtotime($record['created_at'])) ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= date('H:i', strtotime($record['created_at'])) ?>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="6"
+                                            <td colspan="12"
                                                 class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                                 لا توجد سجلات لعرضها
                                             </td>
@@ -353,7 +377,7 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                     </div>
                 </div>
             </main>
-            <script defer src="./assets/js/bundle.js"></script>
+            <script defer src="./assets/js/bundle.js" ط></script>
 </body>
 
 </html>

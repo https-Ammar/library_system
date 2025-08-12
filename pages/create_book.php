@@ -70,6 +70,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>create_book</title>
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+
+<body x-data="{
+        page: 'saas',
+        loaded: true,
+        darkMode: false,
+        stickyMenu: false,
+        sidebarToggle: false,
+        scrollTop: false
+    }" x-init="
+        darkMode = JSON.parse(localStorage.getItem('darkMode')); 
+        $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))
+    " :class="{'dark bg-gray-900': darkMode === true}">
+
+    <main>
+        <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <!-- المحتوى هنا -->
+        </div>
+    </main>
+
+    <script defer src="../assets/js/bundle.js"></script>
+</body>
+
+</html>
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="ar">
 

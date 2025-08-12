@@ -52,13 +52,21 @@ $daily_records = [];
 $result = $mysqli->query("SELECT 
     br.reservation_id,
     s.name AS student_name,
+    s.phone AS student_phone,
+    g.name AS grade_name,
+    t.name AS teacher_name,
+    t.phone AS teacher_phone,
     b.title AS book_title,
+    b.price AS book_price,
     br.amount_paid,
+    br.amount_due,
     br.status,
     br.created_at
 FROM BookReservations br
 JOIN Students s ON br.student_id = s.student_id
 JOIN Books b ON br.book_id = b.book_id
+LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+LEFT JOIN Grades g ON s.grade_id = g.grade_id
 WHERE DATE(br.created_at) = '$today' AND br.deleted_at IS NULL
 ORDER BY br.created_at DESC");
 while ($row = $result->fetch_assoc()) {
@@ -69,13 +77,21 @@ $all_records = [];
 $result = $mysqli->query("SELECT 
     br.reservation_id,
     s.name AS student_name,
+    s.phone AS student_phone,
+    g.name AS grade_name,
+    t.name AS teacher_name,
+    t.phone AS teacher_phone,
     b.title AS book_title,
+    b.price AS book_price,
     br.amount_paid,
+    br.amount_due,
     br.status,
     br.created_at
 FROM BookReservations br
 JOIN Students s ON br.student_id = s.student_id
 JOIN Books b ON br.book_id = b.book_id
+LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+LEFT JOIN Grades g ON s.grade_id = g.grade_id
 WHERE br.deleted_at IS NULL
 ORDER BY br.created_at DESC");
 while ($row = $result->fetch_assoc()) {
@@ -126,18 +142,6 @@ while ($row = $result->fetch_assoc()) {
                                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Overview</h3>
                             </div>
                             <div class="flex gap-x-3.5">
-                                <div x-data="{selected: 'weekly'}"
-                                    class="inline-flex w-full items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900">
-                                    <button @click="selected = 'weekly'"
-                                        :class="selected === 'weekly' ? 'shadow-theme-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400'"
-                                        class="text-theme-sm w-full rounded-md px-3 py-2 font-medium hover:text-gray-900 dark:hover:text-white shadow-theme-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800">Weekly</button>
-                                    <button @click="selected = 'monthly'"
-                                        :class="selected === 'monthly' ? 'shadow-theme-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400'"
-                                        class="text-theme-sm w-full rounded-md px-3 py-2 font-medium hover:text-gray-900 dark:hover:text-white text-gray-500 dark:text-gray-400">Monthly</button>
-                                    <button @click="selected = 'yearly'"
-                                        :class="selected === 'yearly' ? 'shadow-theme-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400'"
-                                        class="text-theme-sm w-full rounded-md px-3 py-2 font-medium hover:text-gray-900 dark:hover:text-white text-gray-500 dark:text-gray-400">Yearly</button>
-                                </div>
                                 <div>
                                     <a href="history.php"
                                         class="text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
@@ -167,8 +171,7 @@ while ($row = $result->fetch_assoc()) {
                                 <div class="mt-2 flex items-end gap-3">
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                        <?= $today_orders ?>
-                                    </h4>
+                                        <?= $today_orders ?></h4>
                                     <div>
                                         <span
                                             class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+2.5%</span>
@@ -182,12 +185,10 @@ while ($row = $result->fetch_assoc()) {
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                         <?= number_format($today_revenue, 2) ?> <sub
-                                            style="font-size: x-small;">EG</sub>
-                                    </h4>
+                                            style="font-size: x-small;">EG</sub></h4>
                                     <div>
                                         <span
-                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+
-                                            9.5%</span>
+                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+9.5%</span>
                                     </div>
                                 </div>
                             </div>
@@ -198,8 +199,7 @@ while ($row = $result->fetch_assoc()) {
                                     <div class="mt-2 flex items-end gap-3">
                                         <h4
                                             class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                            <?= number_format($total_expenses, 2) ?>
-                                        </h4>
+                                            <?= number_format($total_expenses, 2) ?></h4>
                                         <div>
                                             <span
                                                 class="bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">-1.6%</span>
@@ -213,8 +213,7 @@ while ($row = $result->fetch_assoc()) {
                                 <div class="mt-2 flex items-end gap-3">
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                        <?= number_format($total_revenue, 2) ?>
-                                    </h4>
+                                        <?= number_format($total_revenue, 2) ?></h4>
                                     <div>
                                         <span
                                             class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+3.5%</span>
@@ -223,52 +222,48 @@ while ($row = $result->fetch_assoc()) {
                             </div>
                         </div>
                         <div
-                            class="mt-3  grid rounded-2xl border border-gray-200 bg-white sm:grid-cols-2 xl:grid-cols-4 dark:border-gray-800 dark:bg-gray-900">
+                            class="mt-3 grid rounded-2xl border border-gray-200 bg-white sm:grid-cols-2 xl:grid-cols-4 dark:border-gray-800 dark:bg-gray-900">
                             <div
                                 class="border-b border-gray-200 px-6 py-5 sm:border-r xl:border-b-0 dark:border-gray-800">
-                                <span class="text-sm text-gray-500 dark:text-gray-400"> الطلبات المعلقة </span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">الطلبات المعلقة</span>
                                 <div class="mt-2 flex items-end gap-3">
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                        <?= $order_status_counts['pending'] ?>
-                                    </h4>
+                                        <?= $order_status_counts['pending'] ?></h4>
                                 </div>
                             </div>
                             <div
                                 class="border-b border-gray-200 px-6 py-5 xl:border-r xl:border-b-0 dark:border-gray-800">
-                                <span class="text-sm text-gray-500 dark:text-gray-400"> الطلبات الموافق عليها</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">الطلبات الموافق عليها</span>
                                 <div class="mt-2 flex items-end gap-3">
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                        <?= $order_status_counts['approved'] ?>
-                                    </h4>
+                                        <?= $order_status_counts['approved'] ?></h4>
                                 </div>
                             </div>
                             <div
                                 class="border-b border-gray-200 px-6 py-5 sm:border-r sm:border-b-0 dark:border-gray-800">
                                 <div>
-                                    <span class="text-sm text-gray-500 dark:text-gray-400"> الطلبات الملغاة</span>
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">الطلبات الملغاة</span>
                                     <div class="mt-2 flex items-end gap-3">
                                         <h4
                                             class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                            <?= $order_status_counts['cancelled'] ?>
-                                        </h4>
+                                            <?= $order_status_counts['cancelled'] ?></h4>
                                     </div>
                                 </div>
                             </div>
                             <div
                                 class="border-b border-gray-200 px-6 py-5 sm:border-r sm:border-b-0 dark:border-gray-800">
-                                <span class="text-sm text-gray-500 dark:text-gray-400"> الطلبات المرتجعة</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">الطلبات المرتجعة</span>
                                 <div class="mt-2 flex items-end gap-3">
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
-                                        <?= $order_status_counts['returned'] ?>
-                                    </h4>
+                                        <?= $order_status_counts['returned'] ?></h4>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class=" mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         <article
                             class="flex items-center gap-5 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/3">
                             <div
@@ -305,8 +300,7 @@ while ($row = $result->fetch_assoc()) {
                             </div>
                             <div>
                                 <h3 class="text-2xl font-semibold text-gray-800 dark:text-white/90">
-                                    <?= $total_books_sold ?>
-                                </h3>
+                                    <?= $total_books_sold ?></h3>
                                 <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                                     إجمالي الكتب المباعة
                                     <span
@@ -328,8 +322,7 @@ while ($row = $result->fetch_assoc()) {
                             </div>
                             <div>
                                 <h3 class="text-2xl font-semibold text-gray-800 dark:text-white/90">
-                                    <?= $total_students ?>
-                                </h3>
+                                    <?= $total_students ?></h3>
                                 <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                                     عدد الطلاب
                                     <span
@@ -342,10 +335,7 @@ while ($row = $result->fetch_assoc()) {
                     <div
                         class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                         <div class="px-6 py-4">
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
-
-                            </h3>
-
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90"></h3>
                             <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                                 السجل اليومي -
                                 <span
@@ -358,28 +348,40 @@ while ($row = $result->fetch_assoc()) {
                                     <tr class="bg-gray-50 dark:bg-gray-900">
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            #
-                                        </th>
+                                            #</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            اسم الطالب
-                                        </th>
+                                            اسم الطالب</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            اسم الكتاب
-                                        </th>
+                                            رقم الهاتف</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            المبلغ المدفوع
-                                        </th>
+                                            المرحلة</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            الحالة
-                                        </th>
+                                            المدرس</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            الوقت
-                                        </th>
+                                            اسم الكتاب</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            السعر</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            المبلغ المدفوع</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            المبلغ المتبقي</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            الحالة</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            تاريخ الحجز</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            وقت الحجز</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -387,42 +389,56 @@ while ($row = $result->fetch_assoc()) {
                                         <tr>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= $record['reservation_id'] ?>
-
-                                            </td>
+                                                <?= htmlspecialchars($record['reservation_id'] ?? '') ?></td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= $record['student_name'] ?>
-                                            </td>
+                                                <?= htmlspecialchars($record['student_name'] ?? '') ?></td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= $record['book_title'] ?>
-                                            </td>
+                                                <?= htmlspecialchars($record['student_phone'] ?? 'غير متوفر') ?></td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= number_format($record['amount_paid'], 2) ?> ج.م
-                                            </td>
+                                                <?= htmlspecialchars($record['grade_name'] ?? 'غير محدد') ?></td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= htmlspecialchars($record['teacher_name'] ?? 'غير محدد') ?></td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= htmlspecialchars($record['book_title'] ?? '') ?></td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= number_format($record['book_price'] ?? 0, 2) ?> ج.م</td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= number_format($record['amount_paid'] ?? 0, 2) ?> ج.م</td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= number_format($record['amount_due'] ?? 0, 2) ?> ج.م</td>
                                             <td class="px-6 py-4 text-left">
                                                 <?php
-                                                $status_class = '';
-                                                if ($record['status'] == 'approved') {
+                                                $status = $record['status'] ?? 'pending';
+                                                $status_class = 'bg-gray-50 text-gray-600 dark:bg-gray-500/15 dark:text-gray-500';
+
+                                                if ($status == 'approved') {
                                                     $status_class = 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500';
-                                                } elseif ($record['status'] == 'pending') {
+                                                } elseif ($status == 'pending') {
                                                     $status_class = 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500';
-                                                } elseif ($record['status'] == 'cancelled') {
+                                                } elseif ($status == 'cancelled') {
                                                     $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
-                                                } elseif ($record['status'] == 'returned') {
+                                                } elseif ($status == 'returned') {
                                                     $status_class = 'bg-info-50 text-info-600 dark:bg-info-500/15 dark:text-info-500';
                                                 }
                                                 ?>
                                                 <span
-                                                    class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium">
-                                                    <?= $record['status'] ?>
-                                                </span>
+                                                    class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium"><?= htmlspecialchars($status) ?></span>
                                             </td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= date('H:i', strtotime($record['created_at'])) ?>
+                                                <?= isset($record['created_at']) ? date('Y-m-d', strtotime($record['created_at'])) : '' ?>
+                                            </td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= isset($record['created_at']) ? date('H:i', strtotime($record['created_at'])) : '' ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -430,10 +446,11 @@ while ($row = $result->fetch_assoc()) {
                             </table>
                         </div>
                     </div>
-
                 </div>
             </main>
             <script defer src="./assets/js/bundle.js"></script>
+        </div>
+    </div>
 </body>
 
 </html>
