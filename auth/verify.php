@@ -1,42 +1,55 @@
 <?php
 session_start();
-require('../config/db.php');
-
 $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_SESSION['fullName'], $_SESSION['email'], $_SESSION['password'], $_SESSION['randomNumber'])) {
-        $fullName = $_SESSION['fullName'];
-        $email = $_SESSION['email'];
-        $password = $_SESSION['password'];
-        $randomNumber = $_SESSION['randomNumber'];
-        $passwordhash = password_hash($password, PASSWORD_BCRYPT);
+    $user_code = trim($_POST['code'] ?? '');
 
-        $code = trim($_POST['code']);
-
-        if ($code == $randomNumber) {
-            $stmt = $conn->prepare("INSERT INTO usersadmin (name, email, password) VALUES (?, ?, ?)");
-            if ($stmt === false) {
-                die("Failed to prepare statement: " . $conn->error);
-            }
-
-            $stmt->bind_param("sss", $fullName, $email, $passwordhash);
-
-            if ($stmt->execute()) {
-                session_destroy();
-                header("Location: signin.php");
-                exit();
-            } else {
-                echo "Error: " . $stmt->error;
-            }
-
-            $stmt->close();
-            $conn->close();
-        } else {
-            $error_message = "Invalid verification code.";
-        }
+    if (empty($user_code)) {
+        $error_message = "Please enter the verification code.";
+    } elseif (!isset($_SESSION['verification_code'])) {
+        $error_message = "No verification code found. Please register again.";
     } else {
-        $error_message = "Session expired or incomplete data.";
+        $session_code = (string) $_SESSION['verification_code'];
+        $user_code_str = (string) $user_code;
+
+        if (!hash_equals($session_code, $user_code_str)) {
+            $error_message = "Incorrect verification code.";
+        } else {
+            require('../config/db.php');
+
+            $username = $_SESSION['reg_username'] ?? '';
+            $email = $_SESSION['reg_email'] ?? '';
+            $password = $_SESSION['reg_password'] ?? '';
+
+            if (empty($username) || empty($email) || empty($password)) {
+                $error_message = "Session expired. Please register again.";
+            } else {
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
+                if ($stmt) {
+                    $stmt->bind_param("sss", $username, $email, $password_hash);
+                    if ($stmt->execute()) {
+                        $to = "admin@example.com";
+                        $subject = "New User Registration - Permission Required";
+                        $message = "A new user has registered:\n\nUsername: $username\nEmail: $email\n\nPlease review and grant appropriate access permissions in the admin panel.";
+                        $headers = "From: noreply@example.com";
+                        mail($to, $subject, $message, $headers);
+
+                        unset($_SESSION['reg_username'], $_SESSION['reg_email'], $_SESSION['reg_password'], $_SESSION['verification_code']);
+                        session_regenerate_id(true);
+                        header("Location: signin.php");
+                        exit();
+                    } else {
+                        $error_message = "Error registering user.";
+                    }
+                    $stmt->close();
+                } else {
+                    $error_message = "Database error.";
+                }
+            }
+            $conn->close();
+        }
     }
 }
 ?>
@@ -52,13 +65,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Verification</title>
     <link rel="icon" href="favicon.ico">
     <link rel="stylesheet" href="../assets/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif !important;
+        }
+    </style>
 </head>
 
 <body
     x-data="{ page: 'comingSoon', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
-    x-init="
-         darkMode = JSON.parse(localStorage.getItem('darkMode'));
-         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
+    x-init="darkMode = JSON.parse(localStorage.getItem('darkMode')); $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
     :class="{'dark bg-gray-900': darkMode === true}">
     <div x-show="loaded"
         x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
@@ -78,16 +95,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <path d="M12.7083 5L7.5 10.2083L12.7083 15.4167" stroke="" stroke-width="1.5"
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        Back to dashboard
+                        العودة للوحة التحكم
                     </a>
                 </div>
                 <div class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
                     <div class="mb-5 sm:mb-8">
                         <h1 class="text-title-sm sm:text-title-md mb-2 font-semibold text-gray-800 dark:text-white/90">
-                            Two Step Verification
+                            التحقق بخطوتين
                         </h1>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
-                            A verification code has been sent to your email. Please enter the 6-digit code below.
+                            تم إرسال رمز التحقق إلى بريدك الإلكتروني. يرجى إدخال الرمز المكون من 6 أرقام أدناه.
                         </p>
                     </div>
                     <div>
@@ -96,46 +113,56 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <div>
                                     <label
                                         class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400 mb-6">
-                                        Enter your 6-digit security code
+                                        أدخل رمز الأمان المكون من 6 أرقام
                                     </label>
 
                                     <div class="flex gap-2 sm:gap-4" id="otp-container">
-                                        <input type="text" name="code1" maxlength="1"
+                                        <input type="text" name="code1" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
                                             class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-                                        <input type="text" name="code2" maxlength="1"
+                                        <input type="text" name="code2" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
                                             class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-                                        <input type="text" name="code3" maxlength="1"
+                                        <input type="text" name="code3" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
                                             class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-                                        <input type="text" name="code4" maxlength="1"
+                                        <input type="text" name="code4" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
                                             class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-
+                                        <input type="text" name="code5" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
+                                            class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                                        <input type="text" name="code6" maxlength="1" pattern="\d{1}"
+                                            inputmode="numeric" autocomplete="one-time-code"
+                                            class="dark:bg-dark-900 otp-input shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-center text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                                     </div>
                                     <input type="hidden" name="code" id="full-code">
                                 </div>
 
                                 <?php if (!empty($error_message)): ?>
-                                    <p class="text-sm text-red-500"><?php echo $error_message; ?></p>
+                                    <p class="text-sm text-red-500">
+                                        <?php echo htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8'); ?>
+                                    </p>
                                 <?php endif; ?>
 
                                 <div>
-                                    <button
+                                    <button type="submit"
                                         class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-medium text-white transition">
-                                        Verify My Account
+                                        تأكيد الحساب
                                     </button>
                                 </div>
                             </div>
                         </form>
                         <div class="mt-5">
                             <p class="text-center text-sm font-normal text-gray-700 sm:text-start dark:text-gray-400">
-                                Didn't receive the code?
-                                <a href="resend-code.php"
-                                    class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Resend</a>
+                                لدي حساب !
+                                <a href="./signin.php" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">
+                                    تسجيل دخول</a>
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="bg-brand-950 relative hidden h-full w-full items-center lg:grid lg:w-1/2 dark:bg-white/5">
                 <div class="z-1 flex items-center justify-center">
                     <div class="absolute right-0 top-0 -z-1 w-full max-w-[250px] xl:max-w-[450px]">
@@ -146,8 +173,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <div class="flex max-w-xs flex-col items-center">
-                        <p class="text-center text-gray-400 dark:text-white/60">Free and Open-Source Tailwind CSS Admin
-                            Dashboard Template</p>
+
+
                     </div>
                 </div>
             </div>
@@ -198,6 +225,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         }
                     }
                 });
+
+                input.addEventListener('paste', function (e) {
+                    e.preventDefault();
+                    const pasteData = e.clipboardData.getData('text/plain').trim();
+                    if (/^\d{6}$/.test(pasteData)) {
+                        for (let i = 0; i < Math.min(6, pasteData.length); i++) {
+                            otpInputs[i].value = pasteData[i];
+                        }
+                        updateFullCode();
+                    }
+                });
             });
 
             function updateFullCode() {
@@ -209,6 +247,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         });
     </script>
+    <style>
+        * {
+            text-align: right !important;
+        }
+    </style>
 </body>
 
 </html>

@@ -10775,3 +10775,9 @@ button#addColor {
   align-items: center;
   justify-content: center;
 }
+
+.bg-brand-950.relative.hidden.h-full.w-full.items-center.lg\:grid.lg\:w-1\/2.dark\:bg-white\/5 {
+  background: url(../img/login.jpeg);
+  background-size: cover;
+  background-position: right;
+}
