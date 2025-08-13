@@ -150,7 +150,7 @@ while ($row = $result->fetch_assoc()) {
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-white">الإحصائيات</h3>
 
                             <div>
-                                <a href="history.php"
+                                <a href="./pages/history.php"
                                     class="text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
                                     <svg class="fill-white stroke-current dark:fill-gray-800" width="20" height="20"
                                         viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -520,12 +520,9 @@ while ($row = $result->fetch_assoc()) {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
-
                         </div>
                     </div>
-
                 </div>
-
                 <br>
                 <div
                     class=" text-center z-50 p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-l border-gray-200 dark:border-gray-800 rounded-tl-lg text-xs text-gray-600 dark:text-gray-400">
@@ -534,13 +531,10 @@ while ($row = $result->fetch_assoc()) {
                         Ahmed</span> &copy;
                     <span x-text="new Date().getFullYear()"></span>
                 </div>
-
             </main>
-
             <script defer src="./assets/js/bundle.js"></script>
         </div>
     </div>
-
     <style>
         .flex.h-screen.overflow-hidden {
             direction: rtl;
