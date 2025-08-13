@@ -23,7 +23,6 @@ if ($student_id > 0 && $book_id > 0) {
     }
     $stmt->close();
 
-    // جلب بيانات الطالب (مدفوع وباقي)
     $stmt = $mysqli->prepare("SELECT amount_paid, amount_due FROM Students WHERE student_id = ?");
     $stmt->bind_param("i", $student_id);
     $stmt->execute();

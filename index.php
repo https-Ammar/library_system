@@ -139,6 +139,8 @@ while ($row = $result->fetch_assoc()) {
         <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
+
+                
             <main>
                 <?php require('./includes/nav.php'); ?>
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
@@ -533,9 +535,14 @@ while ($row = $result->fetch_assoc()) {
                     <span x-text="new Date().getFullYear()"></span>
                 </div>
             </main>
+
+
+
+
             <script defer src="./assets/js/bundle.js"></script>
         </div>
     </div>
+    
     <style>
         .flex.h-screen.overflow-hidden {
             direction: rtl;

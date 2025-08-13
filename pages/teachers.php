@@ -123,6 +123,8 @@ if (isset($_GET['search'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة المدرسين</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
     <link rel="stylesheet" href="../assets/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -143,7 +145,25 @@ if (isset($_GET['search'])) {
     x-init="darkMode = JSON.parse(localStorage.getItem('darkMode')); $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
     :class="{'dark bg-gray-900': darkMode === true}">
 
-    <main>
+     <div x-show="loaded" x-transition.opacity
+        x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
+        class="fixed inset-0 z-999999 flex items-center justify-center bg-white dark:bg-black">
+        <div class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent">
+        </div>
+    </div>
+
+
+
+    <div class="flex h-screen overflow-hidden">
+        <?php require('../includes/header.php'); ?>
+        <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+            <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
+                class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
+
+
+
+            <main>
+                <?php require('../includes/nav.php'); ?>
         <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
             <div class="col-span-12">
                 <div
@@ -451,6 +471,8 @@ if (isset($_GET['search'])) {
             </div>
         </div>
     </main>
+        </div>
+            </div>
 
     <script defer src="../assets/js/bundle.js"></script>
 </body>

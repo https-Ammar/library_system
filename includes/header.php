@@ -55,6 +55,14 @@
                                     </a>
                                 </li>
 
+                                <li>
+                                    <a href="./pages/create_book.php" class="menu-dropdown-item group"
+                                        :class="page === 'stocks' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
+                                        انشاء كتاب
+
+                                    </a>
+                                </li>
+
                             </ul>
                         </div>
                     </li>
