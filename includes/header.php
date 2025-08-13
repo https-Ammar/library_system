@@ -63,6 +63,26 @@
                                     </a>
                                 </li>
 
+
+                                <li>
+                                    <a href="./pages/expenses.php" class="menu-dropdown-item group"
+                                        :class="page === 'stocks' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
+                                        المصروفات
+
+                                    </a>
+                                </li>
+
+
+                                <li>
+                                    <a href="./pages/book_reservations.php" class="menu-dropdown-item group"
+                                        :class="page === 'stocks' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
+                                        الحجوزات
+
+                                    </a>
+                                </li>
+
+
+
                             </ul>
                         </div>
                     </li>

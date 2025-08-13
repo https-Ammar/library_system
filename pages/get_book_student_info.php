@@ -13,7 +13,6 @@ $response = [
 ];
 
 if ($student_id > 0 && $book_id > 0) {
-    // جلب سعر الكتاب
     $stmt = $mysqli->prepare("SELECT price FROM Books WHERE book_id = ?");
     $stmt->bind_param("i", $book_id);
     $stmt->execute();
