@@ -226,10 +226,11 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                         <h4
                                             class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                             <?= number_format($total_expenses, 2) ?>
+                                            <sub style="font-size: x-small;">EG</sub>
                                         </h4>
                                         <div>
                                             <span
-                                                class="bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">-1.6%</span>
+                                                class="bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">-</span>
                                         </div>
                                     </div>
                                 </div>
@@ -241,10 +242,11 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                     <h4
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                         <?= number_format($total_revenue, 2) ?>
+                                        <sub style="font-size: x-small;">EG</sub>
                                     </h4>
                                     <div>
                                         <span
-                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+3.5%</span>
+                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+</span>
                                     </div>
                                 </div>
                             </div>
@@ -259,6 +261,10 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                         <?= $order_status_counts['pending'] ?>
                                     </h4>
+                                    <div>
+                                        <span
+                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+</span>
+                                    </div>
                                 </div>
                             </div>
                             <div
@@ -269,6 +275,10 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                         <?= $order_status_counts['approved'] ?>
                                     </h4>
+                                    <div>
+                                        <span
+                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+</span>
+                                    </div>
                                 </div>
                             </div>
                             <div
@@ -280,6 +290,10 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                             class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                             <?= $order_status_counts['cancelled'] ?>
                                         </h4>
+                                        <div>
+                                            <span
+                                                class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -291,6 +305,10 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                         class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90">
                                         <?= $order_status_counts['returned'] ?>
                                     </h4>
+                                    <div>
+                                        <span
+                                            class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 flex items-center gap-1 rounded-full py-0.5 pr-2.5 pl-2 text-sm font-medium">+</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
