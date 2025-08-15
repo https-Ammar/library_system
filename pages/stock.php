@@ -42,11 +42,14 @@ $query = "
     SELECT 
         b.book_id, b.title, b.quantity, b.price, b.image_url, b.created_at, b.grade_id,
         g.name AS grade_name,
-        t.name AS teacher_name
+        t.name AS teacher_name,
+        COUNT(br.reservation_id) AS student_count
     FROM Books b
     LEFT JOIN Grades g ON b.grade_id = g.grade_id
     LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+    LEFT JOIN BookReservations br ON b.book_id = br.book_id AND br.deleted_at IS NULL
     WHERE b.deleted_at IS NULL
+    GROUP BY b.book_id
     ORDER BY b.created_at DESC
 ";
 $result = $mysqli->query($query);
@@ -89,7 +92,6 @@ $stats = $stats_result->fetch_assoc();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>المخزون</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-
     <link rel="stylesheet" href="../assets/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -104,6 +106,15 @@ $stats = $stats_result->fetch_assoc();
         .edit-modal.active {
             display: flex;
         }
+
+        .student-count {
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
     </style>
 </head>
 
@@ -111,6 +122,7 @@ $stats = $stats_result->fetch_assoc();
     x-data="{ page: 'saas', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false, 'editModalOpen': false, 'currentBook': null }"
     x-init="darkMode = JSON.parse(localStorage.getItem('darkMode')); $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
     :class="{'dark bg-gray-900': darkMode === true}">
+
     <div x-show="loaded" x-transition.opacity
         x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
         class="fixed inset-0 z-999999 flex items-center justify-center bg-white dark:bg-black">
@@ -118,15 +130,11 @@ $stats = $stats_result->fetch_assoc();
         </div>
     </div>
 
-
-
     <div class="flex h-screen overflow-hidden">
         <?php require('../includes/header.php'); ?>
         <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
-
-
 
             <main>
                 <?php require('../includes/nav.php'); ?>
@@ -255,21 +263,14 @@ $stats = $stats_result->fetch_assoc();
                                                     <div class="flex items-center">
                                                         <p
                                                             class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                            السعر</p>
+                                                            الطلاب المسجلين</p>
                                                     </div>
                                                 </th>
                                                 <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
                                                         <p
                                                             class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                            تاريخ الإضافة</p>
-                                                    </div>
-                                                </th>
-                                                <th class="px-6 py-3 whitespace-nowrap">
-                                                    <div class="flex items-center">
-                                                        <p
-                                                            class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                            تعديل</p>
+                                                            إجراءات</p>
                                                     </div>
                                                 </th>
                                             </tr>
@@ -281,16 +282,14 @@ $stats = $stats_result->fetch_assoc();
                                                     <tr>
                                                         <td class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                             <div class="flex items-center">
-                                                                <div class="flex items-center gap-3">
-                                                                    <div class="h-[50px] w-[50px] overflow-hidden rounded-md">
-                                                                        <?php if (!empty($product['image_url']) && file_exists($product['image_url'])): ?>
-                                                                            <img src="<?= htmlspecialchars($product['image_url']) ?>"
-                                                                                alt="صورة الكتاب">
-                                                                        <?php else: ?>
-                                                                            <img src="src/images/product/default.jpg"
-                                                                                alt="صورة افتراضية">
-                                                                        <?php endif; ?>
-                                                                    </div>
+                                                                <div class="h-[50px] w-[50px] overflow-hidden rounded-md">
+                                                                    <?php if (!empty($product['image_url']) && file_exists($product['image_url'])): ?>
+                                                                        <img src="<?= htmlspecialchars($product['image_url']) ?>"
+                                                                            alt="صورة الكتاب">
+                                                                    <?php else: ?>
+                                                                        <img src="src/images/product/default.jpg"
+                                                                            alt="صورة افتراضية">
+                                                                    <?php endif; ?>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -325,17 +324,10 @@ $stats = $stats_result->fetch_assoc();
                                                         </td>
                                                         <td class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                             <div class="flex items-center">
-                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                                    <?= number_format((float) $product['price'], 2) ?> <sub
-                                                                        style="font-size: x-small;">EG</sub>
-                                                                </p>
-                                                            </div>
-                                                        </td>
-                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
-                                                            <div class="flex items-center">
-                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                                    <?= date('Y-m-d', strtotime($product['created_at'])) ?>
-                                                                </p>
+                                                                <a href="book_students.php?book_id=<?= $product['book_id'] ?>"
+                                                                    class="flex items-center text-blue-600 hover:underline text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    عدد الطلاب (<?= $product['student_count'] ?>)
+                                                                </a>
                                                             </div>
                                                         </td>
                                                         <td class="px-6 py-3 whitespace-nowrap first:pl-0">
@@ -382,109 +374,6 @@ $stats = $stats_result->fetch_assoc();
                                         </tbody>
                                     </table>
                                 </div>
-
-                                <div x-show="editModalOpen" x-transition:enter="transition ease-out duration-300"
-                                    x-transition:enter-start="opacity-0 scale-95"
-                                    x-transition:enter-end="opacity-100 scale-100"
-                                    x-transition:leave="transition ease-in duration-200"
-                                    x-transition:leave-start="opacity-100 scale-100"
-                                    x-transition:leave-end="opacity-0 scale-95"
-                                    class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999"
-                                    :class="{'hidden': !editModalOpen}">
-
-                                    <!-- الخلفية -->
-                                    <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
-                                        @click="editModalOpen = false">
-                                    </div>
-
-                                    <!-- نافذة التعديل -->
-                                    <div @click.outside="editModalOpen = false"
-                                        class="no-scrollbar relative w-full max-w-[700px] mx-auto overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
-
-                                        <div class="px-2">
-                                            <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-                                                تعديل الكتب الدراسية
-                                            </h4>
-                                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-                                                إدارة الكتب الدراسية بسهولة
-                                            </p>
-                                        </div>
-
-                                        <!-- فورم التعديل -->
-                                        <form method="POST" class="flex flex-col">
-                                            <input type="hidden" name="book_id" x-model="currentBook.book_id">
-
-                                            <div class="custom-scrollbar overflow-y-auto px-2">
-                                                <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-
-                                                    <!-- الكمية -->
-                                                    <div class="sm:col-span-2">
-                                                        <label
-                                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                                            الكمية
-                                                        </label>
-                                                        <input type="number" name="quantity"
-                                                            x-model="currentBook.quantity" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                   dark:text-white/90">
-                                                    </div>
-
-                                                    <!-- السعر -->
-                                                    <div class="sm:col-span-2">
-                                                        <label
-                                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                                            السعر
-                                                        </label>
-                                                        <input type="number" step="0.01" name="price"
-                                                            x-model="currentBook.price" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                   dark:text-white/90">
-                                                    </div>
-
-                                                    <!-- الصف -->
-                                                    <div class="sm:col-span-2">
-                                                        <label
-                                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                                            الصف
-                                                        </label>
-                                                        <select name="grade_id" x-model="currentBook.grade_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                   dark:text-white/90">
-                                                            <?php $grades_result->data_seek(0); ?>
-                                                            <?php while ($grade = $grades_result->fetch_assoc()): ?>
-                                                                <option value="<?= $grade['grade_id'] ?>">
-                                                                    <?= htmlspecialchars($grade['name']) ?>
-                                                                </option>
-                                                            <?php endwhile; ?>
-                                                        </select>
-                                                    </div>
-
-                                                </div>
-                                            </div>
-
-                                            <!-- الأزرار -->
-                                            <div
-                                                class="flex flex-col items-center gap-6 px-2 mt-6 sm:flex-row sm:justify-between">
-                                                <div class="flex items-center w-full gap-3 sm:w-auto">
-                                                    <button type="button" @click="editModalOpen = false" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 
-                               text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 
-                               dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
-                                                        إلغاء
-                                                    </button>
-                                                    <button type="submit" name="update" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm 
-                               font-medium text-white hover:bg-brand-600 sm:w-auto">
-                                                        حفظ التغييرات
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                        </form>
-                                    </div>
-                                </div>
-
 
                                 <div id="finished" class="tabcontent" style="display: none;">
                                     <table class="min-w-full">
@@ -641,14 +530,100 @@ $stats = $stats_result->fetch_assoc();
                             </div>
                         </div>
                     </div>
+
+                    <div x-show="editModalOpen" x-transition:enter="transition ease-out duration-300"
+                        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-200"
+                        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                        class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999"
+                        :class="{'hidden': !editModalOpen}">
+
+                        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
+                            @click="editModalOpen = false">
+                        </div>
+
+                        <div @click.outside="editModalOpen = false"
+                            class="no-scrollbar relative w-full max-w-[700px] mx-auto overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
+
+                            <div class="px-2">
+                                <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
+                                    تعديل الكتب الدراسية
+                                </h4>
+                                <p class="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
+                                    إدارة الكتب الدراسية بسهولة
+                                </p>
+                            </div>
+
+                            <form method="POST" class="flex flex-col">
+                                <input type="hidden" name="book_id" x-model="currentBook.book_id">
+
+                                <div class="custom-scrollbar overflow-y-auto px-2">
+                                    <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+
+                                        <div class="sm:col-span-2">
+                                            <label
+                                                class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                                الكمية
+                                            </label>
+                                            <input type="number" name="quantity" x-model="currentBook.quantity" required
+                                                class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
+                               text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                               focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                               dark:text-white/90">
+                                        </div>
+
+                                        <div class="sm:col-span-2">
+                                            <label
+                                                class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                                السعر
+                                            </label>
+                                            <input type="number" step="0.01" name="price" x-model="currentBook.price"
+                                                required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
+                               text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                               focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                               dark:text-white/90">
+                                        </div>
+
+                                        <div class="sm:col-span-2">
+                                            <label
+                                                class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                                الصف
+                                            </label>
+                                            <select name="grade_id" x-model="currentBook.grade_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
+                               text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                               focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                               dark:text-white/90">
+                                                <?php $grades_result->data_seek(0); ?>
+                                                <?php while ($grade = $grades_result->fetch_assoc()): ?>
+                                                    <option value="<?= $grade['grade_id'] ?>">
+                                                        <?= htmlspecialchars($grade['name']) ?>
+                                                    </option>
+                                                <?php endwhile; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col items-center gap-6 px-2 mt-6 sm:flex-row sm:justify-between">
+                                    <div class="flex items-center w-full gap-3 sm:w-auto">
+                                        <button type="button" @click="editModalOpen = false" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 
+                           text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 
+                           dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
+                                            إلغاء
+                                        </button>
+                                        <button type="submit" name="update" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm 
+                           font-medium text-white hover:bg-brand-600 sm:w-auto">
+                                            حفظ التغييرات
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </main>
-
-
-
         </div>
     </div>
-
 
     <script defer src="../assets/js/bundle.js"></script>
     <script>
@@ -670,12 +645,7 @@ $stats = $stats_result->fetch_assoc();
             document.querySelector('.tablinks').click();
         });
     </script>
-
-
-
-
 </body>
 
 </html>
-
 <?php $mysqli->close(); ?>

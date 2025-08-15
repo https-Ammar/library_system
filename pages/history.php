@@ -49,14 +49,17 @@ $all_records = [];
 $stmt = $mysqli->prepare("
     SELECT 
         br.reservation_id,
+        br.order_number,
         s.name AS student_name,
         s.phone AS student_phone,
         g.name AS grade_name,
         t.name AS teacher_name,
         b.title AS book_title,
         b.price AS book_price,
+        br.quantity,
         br.amount_paid,
-        (b.price - br.amount_paid) AS amount_due,
+        (b.price * br.quantity - br.amount_paid) AS amount_due,
+        (b.price * br.quantity) AS total_amount,
         br.status,
         br.created_at
     FROM BookReservations br
@@ -129,7 +132,6 @@ $total_users = $mysqli->query("
     WHERE deleted_at IS NULL
 ")->fetch_assoc()['total_users'] ?? 0;
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -387,23 +389,20 @@ $total_users = $mysqli->query("
                             <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400 justify-between">
                                 السجل اليومي
 
-
-
                                 <span
                                     class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium">
-                                    <?= $selected_date ?> </span>
-
-
-
+                                    <?= $selected_date ?>
+                                </span>
                             </p>
                         </div>
-
-
 
                         <div class="custom-scrollbar overflow-x-auto">
                             <table class="min-w-full">
                                 <thead>
                                     <tr class="bg-gray-50 dark:bg-gray-900">
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            رقم الطلب</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             اسم الطالب</th>
@@ -419,6 +418,12 @@ $total_users = $mysqli->query("
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             السعر</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            الكمية</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            الإجمالي</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             المدفوع</th>
@@ -437,6 +442,10 @@ $total_users = $mysqli->query("
                                     <?php if (count($all_records) > 0): ?>
                                         <?php foreach ($all_records as $record): ?>
                                             <tr>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= $record['order_number'] ?>
+                                                </td>
                                                 <td class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
                                                         <div class="flex items-center gap-3">
@@ -470,6 +479,15 @@ $total_users = $mysqli->query("
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?= number_format($record['book_price'], 2) ?> <sub
+                                                        style="font-size: x-small;">EG</sub>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= $record['quantity'] ?>
+                                                </td>
+                                                <td
+                                                    class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                    <?= number_format($record['total_amount'], 2) ?> <sub
                                                         style="font-size: x-small;">EG</sub>
                                                 </td>
                                                 <td

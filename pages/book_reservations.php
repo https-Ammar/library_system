@@ -7,7 +7,8 @@ if (isset($_GET['delete'])) {
 
     $mysqli->begin_transaction();
     try {
-        $getBook = $mysqli->prepare("SELECT book_id, status FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
+        // جلب بيانات الحجز بما فيها الكمية
+        $getBook = $mysqli->prepare("SELECT book_id, status, quantity FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
         $getBook->bind_param("i", $id);
         $getBook->execute();
         $bookData = $getBook->get_result()->fetch_assoc();
@@ -19,15 +20,18 @@ if (isset($_GET['delete'])) {
 
         $book_id = $bookData['book_id'];
         $status = $bookData['status'];
+        $quantity = $bookData['quantity']; // الكمية المحجوزة
 
+        // حذف الحجز (حذف ناعم)
         $stmt = $mysqli->prepare("UPDATE BookReservations SET deleted_at = NOW() WHERE reservation_id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $stmt->close();
 
+        // إعادة الكمية إلى المخزون إذا لم يكن الحجز ملغى أو معاد من قبل
         if ($status !== 'cancelled' && $status !== 'returned') {
-            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + 1 WHERE book_id = ?");
-            $updateQty->bind_param("i", $book_id);
+            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + ? WHERE book_id = ?");
+            $updateQty->bind_param("ii", $quantity, $book_id);
             $updateQty->execute();
             $updateQty->close();
         }
@@ -47,10 +51,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
     $reservation_id = intval($_POST['edit_reservation_id']);
     $status = $_POST['status'];
     $amount_paid = isset($_POST['amount_paid']) ? floatval($_POST['amount_paid']) : null;
+    $receipt_image = null;
+
+    if (isset($_FILES['receipt_image']) && $_FILES['receipt_image']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = '../uploads/receipts/';
+        if (!file_exists($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+
+        $fileExt = pathinfo($_FILES['receipt_image']['name'], PATHINFO_EXTENSION);
+        $fileName = 'receipt_' . uniqid() . '.' . $fileExt;
+        $targetPath = $uploadDir . $fileName;
+
+        if (move_uploaded_file($_FILES['receipt_image']['tmp_name'], $targetPath)) {
+            $receipt_image = $targetPath;
+        }
+    }
 
     $mysqli->begin_transaction();
     try {
-        $getBook = $mysqli->prepare("SELECT book_id, status, amount_paid, amount_due FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
+        // جلب بيانات الحجز بما فيها الكمية
+        $getBook = $mysqli->prepare("SELECT book_id, status, amount_paid, amount_due, receipt_image, quantity FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
         $getBook->bind_param("i", $reservation_id);
         $getBook->execute();
         $bookData = $getBook->get_result()->fetch_assoc();
@@ -64,6 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
         $old_status = $bookData['status'];
         $old_amount_paid = $bookData['amount_paid'];
         $amount_due = $bookData['amount_due'];
+        $old_receipt_image = $bookData['receipt_image'];
+        $quantity = $bookData['quantity']; // الكمية المحجوزة
+
+        if ($receipt_image === null) {
+            $receipt_image = $old_receipt_image;
+        }
 
         if ($amount_paid !== null) {
             $amount_due = max($amount_due - ($amount_paid - $old_amount_paid), 0);
@@ -72,43 +99,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
                 SET status = ?, 
                     amount_paid = ?,
                     amount_due = ?,
+                    receipt_image = ?,
                     approved_date = CASE WHEN ? = 'approved' THEN NOW() ELSE approved_date END, 
                     due_date = CASE WHEN ? = 'approved' THEN DATE_ADD(NOW(), INTERVAL 14 DAY) ELSE due_date END, 
                     return_date = CASE WHEN ? = 'returned' THEN NOW() ELSE return_date END 
                 WHERE reservation_id = ?
             ");
-            $stmt->bind_param("sddsssi", $status, $amount_paid, $amount_due, $status, $status, $status, $reservation_id);
+            $stmt->bind_param("sddssssi", $status, $amount_paid, $amount_due, $receipt_image, $status, $status, $status, $reservation_id);
         } else {
             $stmt = $mysqli->prepare("
                 UPDATE BookReservations 
                 SET status = ?, 
+                    receipt_image = ?,
                     approved_date = CASE WHEN ? = 'approved' THEN NOW() ELSE approved_date END, 
                     due_date = CASE WHEN ? = 'approved' THEN DATE_ADD(NOW(), INTERVAL 14 DAY) ELSE due_date END, 
                     return_date = CASE WHEN ? = 'returned' THEN NOW() ELSE return_date END 
                 WHERE reservation_id = ?
             ");
-            $stmt->bind_param("ssssi", $status, $status, $status, $status, $reservation_id);
+            $stmt->bind_param("sssssi", $status, $receipt_image, $status, $status, $status, $reservation_id);
         }
 
         $stmt->execute();
         $stmt->close();
 
+        // إدارة الكميات بناءً على تغيير الحالة
         if (
             ($status === 'cancelled' || $status === 'returned') &&
             !in_array($old_status, ['cancelled', 'returned'])
         ) {
-            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + 1 WHERE book_id = ?");
-            $updateQty->bind_param("i", $book_id);
+            // إعادة الكمية كاملة إلى المخزون
+            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + ? WHERE book_id = ?");
+            $updateQty->bind_param("ii", $quantity, $book_id);
             $updateQty->execute();
             $updateQty->close();
         } elseif (
             ($old_status === 'cancelled' || $old_status === 'returned') &&
             !in_array($status, ['cancelled', 'returned'])
         ) {
-            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = GREATEST(quantity - 1, 0) WHERE book_id = ?");
-            $updateQty->bind_param("i", $book_id);
+            // خصم الكمية كاملة من المخزون
+            $updateQty = $mysqli->prepare("UPDATE Books SET quantity = GREATEST(quantity - ?, 0) WHERE book_id = ?");
+            $updateQty->bind_param("ii", $quantity, $book_id);
             $updateQty->execute();
             $updateQty->close();
+        }
+
+        if ($receipt_image !== $old_receipt_image && $old_receipt_image && file_exists($old_receipt_image)) {
+            unlink($old_receipt_image);
         }
 
         $mysqli->commit();
@@ -122,68 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
     exit;
 }
 
-$add_errors = [];
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reservation'])) {
-    $student_id = intval($_POST['student_id']);
-    $teacher_id = intval($_POST['teacher_id']);
-    $book_id = intval($_POST['book_id']);
-    $reservation_date = $_POST['reservation_date'] ?: date('Y-m-d');
-    $amount_paid = floatval($_POST['amount_paid']);
-    $book_price = floatval($_POST['book_price']);
-
-    if ($student_id <= 0)
-        $add_errors[] = "اختر الطالب.";
-    if ($teacher_id <= 0)
-        $add_errors[] = "اختر المدرس.";
-    if ($book_id <= 0)
-        $add_errors[] = "اختر الكتاب.";
-    if ($amount_paid < 0)
-        $add_errors[] = "المبلغ المدفوع غير صحيح.";
-    if ($book_price < 0)
-        $add_errors[] = "سعر الكتاب غير صحيح.";
-
-    if (empty($add_errors)) {
-        $mysqli->begin_transaction();
-        try {
-            $check = $mysqli->prepare("SELECT quantity, price FROM Books WHERE book_id = ? FOR UPDATE");
-            $check->bind_param("i", $book_id);
-            $check->execute();
-            $result = $check->get_result();
-            $book = $result->fetch_assoc();
-            $check->close();
-
-            if (!$book) {
-                throw new Exception("الكتاب غير موجود.");
-            } elseif ($book['quantity'] < 1) {
-                throw new Exception("عذرًا، لا توجد نسخ متاحة من هذا الكتاب.");
-            }
-
-            $amount_due = max($book_price - $amount_paid, 0);
-
-            $stmt = $mysqli->prepare("
-                INSERT INTO BookReservations (student_id, book_id, reservation_date, status, amount_paid, amount_due) 
-                VALUES (?, ?, ?, 'pending', ?, ?)
-            ");
-            $stmt->bind_param("iisdd", $student_id, $book_id, $reservation_date, $amount_paid, $amount_due);
-            $stmt->execute();
-            $stmt->close();
-
-            $update = $mysqli->prepare("UPDATE Books SET quantity = GREATEST(quantity - 1, 0) WHERE book_id = ?");
-            $update->bind_param("i", $book_id);
-            $update->execute();
-            $update->close();
-
-            $mysqli->commit();
-            $_SESSION['message'] = "تم حجز الكتاب بنجاح";
-            header('Location: book_reservations.php');
-            exit;
-        } catch (Exception $e) {
-            $mysqli->rollback();
-            $add_errors[] = "فشل الحجز: " . $e->getMessage();
-        }
-    }
-}
-
+// بقية الكود كما هو...
 $search = isset($_GET['search']) ? $mysqli->real_escape_string($_GET['search']) : '';
 $reservations_query = "
 SELECT br.*, 
@@ -208,7 +183,8 @@ if (!empty($search)) {
         b.title LIKE '%$search%' OR 
         t.name LIKE '%$search%' OR 
         g.name LIKE '%$search%' OR 
-        br.reservation_id = '$search'
+        br.reservation_id = '$search' OR
+        br.order_number LIKE '%$search%'
     )";
 }
 
@@ -272,53 +248,44 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
         </div>
     </div>
 
-
-
     <div class="flex h-screen overflow-hidden">
         <?php require('../includes/header.php'); ?>
         <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
 
-
-
             <main>
                 <?php require('../includes/nav.php'); ?>
 
-
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
 
-
-
                     <div class="mb-8 flex flex-col justify-between gap-4  flex-row items-center">
-
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-white"> السجل الحجز</h3>
-
                         <div>
-                            <button @click="isTaskModalModal = true"
-                                class="text-theme-sm shadow-theme-xs inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-                                <svg class="stroke-current fill-white dark:fill-gray-800" width="20" height="20"
-                                    viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M2.29004 5.90393H17.7067" stroke="" stroke-width="1.5"
-                                        stroke-linecap="round" stroke-linejoin="round"></path>
-                                    <path d="M17.7075 14.0961H2.29085" stroke="" stroke-width="1.5"
-                                        stroke-linecap="round" stroke-linejoin="round"></path>
-                                    <path
-                                        d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
-                                        fill="" stroke="" stroke-width="1.5"></path>
-                                    <path
-                                        d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
-                                        fill="" stroke="" stroke-width="1.5"></path>
-                                </svg>
-                                إضافة حجز جديد
-                            </button>
+                            <a href="./add_reservation.php">
+                                <button @click="isTaskModalModal = true"
+                                    class="text-theme-sm shadow-theme-xs inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                                    <svg class="stroke-current fill-white dark:fill-gray-800" width="20" height="20"
+                                        viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M2.29004 5.90393H17.7067" stroke="" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round"></path>
+                                        <path d="M17.7075 14.0961H2.29085" stroke="" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round"></path>
+                                        <path
+                                            d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
+                                            fill="" stroke="" stroke-width="1.5"></path>
+                                        <path
+                                            d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
+                                            fill="" stroke="" stroke-width="1.5"></path>
+                                    </svg>
+                                    إضافة حجز جديد
+                                </button>
+                            </a>
                         </div>
                     </div>
 
                     <div class="col-span-12">
-                        <!-- Metric Group Three -->
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
-                            <!-- Metric Item Start -->
                             <div
                                 class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                                 <div
@@ -333,7 +300,6 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
 
                                 <p class="text-theme-sm text-gray-500 dark:text-gray-400">
                                     إجمالي المدرسين
-
                                 </p>
 
                                 <div class="mt-3 flex items-end justify-between">
@@ -348,14 +314,10 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                             class="flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-theme-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">
                                             +
                                         </span>
-
-
                                     </div>
                                 </div>
                             </div>
-                            <!-- Metric Item End -->
 
-                            <!-- Metric Item Start -->
                             <div
                                 class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                                 <div
@@ -370,7 +332,6 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
 
                                 <p class="text-theme-sm text-gray-500 dark:text-gray-400">
                                     إجمالي الحجوزات
-
                                 </p>
 
                                 <div class="mt-3 flex items-end justify-between">
@@ -385,14 +346,10 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                             class="flex items-center gap-1 rounded-full bg-error-50 px-2 py-0.5 text-theme-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500">
                                             -
                                         </span>
-
-
                                     </div>
                                 </div>
                             </div>
-                            <!-- Metric Item End -->
 
-                            <!-- Metric Item Start -->
                             <div
                                 class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                                 <div
@@ -413,7 +370,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                         <h4 class="text-title-sm font-bold text-gray-800 dark:text-white/90">
                                             <?php
                                             $total_amount = 0;
-                                            $teachers_stats->data_seek(0); // إعادة تعيين مؤشر النتائج
+                                            $teachers_stats->data_seek(0);
                                             while ($teacher = $teachers_stats->fetch_assoc()) {
                                                 $total_amount += $teacher['total_amount'];
                                             }
@@ -427,29 +384,21 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                             class="flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-theme-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">
                                             +
                                         </span>
-
                                     </div>
                                 </div>
                             </div>
-                            <!-- Metric Item End -->
                         </div>
-                        <!-- Metric Group Three -->
                     </div>
                     <div class="col-span-12 mt-6">
                         <div
                             class="overflow-hidden rounded-2xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/[0.03]">
-
                             <div class="flex flex-col gap-5 px-6 mb-4 sm:flex-row sm:items-center sm:justify-between">
-
-
-
                                 <div>
                                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
                                         حجوزات الكتب
                                     </h3>
                                 </div>
                                 <div class="flex items-center gap-3">
-
                                     <form method="GET" action="" class="flex">
                                         <div class="relative">
                                             <span class="absolute -translate-y-1/2 pointer-events-none top-1/2 left-4">
@@ -460,13 +409,10 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                         fill=""></path>
                                                 </svg>
                                             </span>
+
                                             <input type="text" name="search" placeholder="بحث..."
                                                 value="<?= isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '' ?>"
-                                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 
-                           dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent 
-                           py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 
-                           focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 
-                           dark:placeholder:text-white/30">
+                                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
                                         </div>
                                     </form>
                                 </div>
@@ -477,88 +423,117 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                     <thead
                                         class="border-gray-100 border-y bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                                         <tr>
-
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        اسم الطالب
-                                                    </p>
-                                                </div>
-                                            </th>
-
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p
-                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        المدرس
-                                                    </p>
+                                                        رقم الطلب</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الكتاب
-                                                    </p>
+                                                        اسم الطالب</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        السعر
-                                                    </p>
-                                                </div>
-                                            </th>
-
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p
-                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        المدفوع
-                                                    </p>
+                                                        الكمية</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الباقي
-                                                    </p>
-                                                </div>
-                                            </th>
-
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p
-                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        التاريخ
-                                                    </p>
+                                                        المدرس</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الحالة
-                                                    </p>
+                                                        الكتاب</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        السعر</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        الإجمالي</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        المدفوع</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        الباقي</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        التاريخ</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        الإيصال</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        الحالة</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center justify-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        إجراءات
-                                                    </p>
+                                                        حفظ</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center justify-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        حذف</p>
                                                 </div>
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                                         <?php if ($reservations && $reservations->num_rows > 0):
-                                            while ($row = $reservations->fetch_assoc()): ?>
+                                            while ($row = $reservations->fetch_assoc()):
+                                                $total_price = $row['book_price'] * $row['quantity'];
+                                                ?>
                                                 <tr>
+                                                    <td class="px-6 py-3 whitespace-nowrap">
+                                                        <p class="text-gray-700 text-theme-sm dark:text-gray-400">
+                                                            <?= htmlspecialchars($row['order_number']) ?>
+                                                        </p>
+                                                    </td>
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <div class="flex items-center">
                                                             <div class="flex items-center gap-3">
@@ -581,7 +556,11 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                             </div>
                                                         </div>
                                                     </td>
-
+                                                    <td class="px-6 py-3 whitespace-nowrap text-center">
+                                                        <p class="text-gray-700 text-theme-sm dark:text-gray-400">
+                                                            <?= $row['quantity'] ?>
+                                                        </p>
+                                                    </td>
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
                                                             <?= htmlspecialchars($row['teacher_name']) ?>
@@ -597,32 +576,43 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                             <?= number_format($row['book_price'], 2) ?>
                                                         </p>
                                                     </td>
-
+                                                    <td class="px-6 py-3 whitespace-nowrap text-end">
+                                                        <p class="text-gray-700 text-theme-sm dark:text-gray-400">
+                                                            <?= number_format($total_price, 2) ?>
+                                                        </p>
+                                                    </td>
                                                     <td class="px-6 py-3 whitespace-nowrap text-end">
                                                         <form method="post" class="flex items-center gap-2 justify-end">
                                                             <input type="hidden" name="edit_reservation_id"
                                                                 value="<?= $row['reservation_id'] ?>">
                                                             <input type="number" name="amount_paid" step="0.01" min="0"
-                                                                max="<?= $row['book_price'] ?>"
-                                                                value="<?= $row['amount_paid'] ?>"
+                                                                max="<?= $total_price ?>" value="<?= $row['amount_paid'] ?>"
                                                                 class="dark:bg-dark-900 h-8 w-24 rounded-lg border border-gray-300 bg-transparent px-2 py-1 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                                         </form>
                                                     </td>
-
                                                     <td class="px-6 py-3 whitespace-nowrap text-end">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
                                                             <?= number_format($row['amount_due'], 2) ?>
                                                         </p>
                                                     </td>
-
                                                     <td class="px-6 py-3 whitespace-nowrap text-center">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
                                                             <?= $row['reservation_date'] ?>
                                                         </p>
                                                     </td>
-
                                                     <td class="px-6 py-3 whitespace-nowrap text-center">
-                                                        <form method="post" class="flex items-center gap-2">
+                                                        <?php if (!empty($row['receipt_image'])): ?>
+                                                            <a href="<?= $row['receipt_image'] ?>" target="_blank"
+                                                                class="text-blue-500 hover:underline text-gray-700 text-theme-sm dark:text-gray-400">
+                                                                عرض الإيصال
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <span class="text-gray-500">لا يوجد</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <form method="post" enctype="multipart/form-data"
+                                                        class="flex items-center gap-2">
+                                                        <td class="px-6 py-3 whitespace-nowrap text-center">
                                                             <input type="hidden" name="edit_reservation_id"
                                                                 value="<?= $row['reservation_id'] ?>">
                                                             <select name="status" required
@@ -632,17 +622,19 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                                 <option value="cancelled" <?= $row['status'] == 'cancelled' ? 'selected' : '' ?>>ملغي</option>
                                                                 <option value="returned" <?= $row['status'] == 'returned' ? 'selected' : '' ?>>معاد</option>
                                                             </select>
-                                                            <button type="submit" class="btn btn-primary btn-sm">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap text-center">
+                                                            <button type="submit"
+                                                                class="btn btn-primary btn-sm text-gray-700 text-theme-sm dark:text-gray-400">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19"
                                                                     fill="currentColor" viewBox="0 0 16 16">
                                                                     <path d="M11 2H9v3h2z" />
                                                                     <path
                                                                         d="M1.5 0h11.586a1.5 1.5 0 0 1 1.06.44l1.415 1.414A1.5 1.5 0 0 1 16 2.914V14.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14.5v-13A1.5 1.5 0 0 1 1.5 0M1 1.5v13a.5.5 0 0 0 .5.5H2v-4.5A1.5 1.5 0 0 1 3.5 9h9a1.5 1.5 0 0 1 1.5 1.5V15h.5a.5.5 0 0 0 .5-.5V2.914a.5.5 0 0 0-.146-.353l-1.415-1.415A.5.5 0 0 0 13.086 1H13v4.5A1.5 1.5 0 0 1 11.5 7h-7A1.5 1.5 0 0 1 3 5.5V1H1.5a.5.5 0 0 0-.5.5m3 4a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V1H4zM3 15h10v-4.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5z" />
                                                                 </svg>
                                                             </button>
-                                                        </form>
-                                                    </td>
-
+                                                        </td>
+                                                    </form>
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <div class="flex items-center justify-center gap-3">
                                                             <a href="?delete=<?= $row['reservation_id'] ?>"
@@ -663,7 +655,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                 </tr>
                                             <?php endwhile; else: ?>
                                             <tr>
-                                                <td colspan="11" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                <td colspan="14" class="text-center py-4 text-gray-500 dark:text-gray-400">
                                                     لا توجد بيانات للعرض
                                                 </td>
                                             </tr>
@@ -675,153 +667,13 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                     </div>
                 </div>
 
-                <div x-show="isTaskModalModal" x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-200"
-                    x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                    class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999"
-                    :class="{'hidden': !isTaskModalModal}">
-                    <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
-                        @click="isTaskModalModal = false"></div>
 
-                    <div @click.outside="isTaskModalModal = false"
-                        class="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
-
-                        <div class="px-2">
-                            <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-                                إضافة حجز جديد </h4>
-                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">إدارة حجوزات الكتب بسهولة
-                            </p>
-                        </div>
-
-                        <form class="flex flex-col" method="POST" action="">
-                            <div class="custom-scrollbar overflow-y-auto px-2">
-                                <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                            الطالب</label>
-                                        <select name="student_id" required
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                            <option value="">-- اختر الطالب --</option>
-                                            <?php while ($student = $students->fetch_assoc()): ?>
-                                                <option value="<?= $student['student_id'] ?>">
-                                                    <?= htmlspecialchars($student['name']) ?> -
-                                                    <?= htmlspecialchars($student['grade_name']) ?>
-                                                </option>
-                                            <?php endwhile; ?>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                            المدرس</label>
-                                        <select name="teacher_id" id="teacher_id" onchange="fetchBooks()" required
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                            <option value="">-- اختر المدرس --</option>
-                                            <?php while ($teacher = $teachers->fetch_assoc()): ?>
-                                                <option value="<?= $teacher['teacher_id'] ?>">
-                                                    <?= htmlspecialchars($teacher['name']) ?>
-                                                </option>
-                                            <?php endwhile; ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="sm:col-span-2">
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                            الكتاب</label>
-                                        <select name="book_id" id="book_id" onchange="fetchInfo()" required
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                            <option value="">-- اختر الكتاب --</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">سعر
-                                            الكتاب</label>
-                                        <input type="number" step="0.01" name="book_price" id="book_price" readonly
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">المبلغ
-                                            المدفوع</label>
-                                        <input type="number" step="0.01" name="amount_paid" id="amount_paid"
-                                            oninput="calculateDue()" required
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">الباقي</label>
-                                        <input type="number" step="0.01" name="amount_due" id="amount_due" readonly
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">تاريخ
-                                            الحجز</label>
-                                        <input type="date" name="reservation_date" value="<?= date('Y-m-d') ?>" required
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-6 px-2 mt-6 sm:flex-row sm:justify-between">
-                                <div class="flex items-center w-full gap-3 sm:w-auto">
-                                    <button @click="isTaskModalModal = false" type="button"
-                                        class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto">إلغاء</button>
-                                    <button type="submit" name="add_reservation"
-                                        class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto">
-                                        حجز الكتاب </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </main>
         </div>
+        </main>
+    </div>
     </div>
     <script defer src="../assets/js/bundle.js"></script>
-    <script>
-        function fetchBooks() {
-            let teacherId = document.getElementById('teacher_id').value;
-            let bookSelect = document.getElementById('book_id');
-            bookSelect.innerHTML = '<option value="">جاري التحميل...</option>';
-            if (teacherId) {
-                fetch('get_books.php?teacher_id=' + teacherId)
-                    .then(res => res.json())
-                    .then(data => {
-                        bookSelect.innerHTML = '<option value="">-- اختر الكتاب --</option>';
-                        data.forEach(book => {
-                            bookSelect.innerHTML += `<option value="${book.book_id}" data-price="${book.price}">${book.title} - ${book.price} ر.س (المتبقي: ${book.quantity})</option>`;
-                        });
-                    });
-            } else {
-                bookSelect.innerHTML = '<option value="">-- اختر الكتاب --</option>';
-            }
-        }
 
-        function fetchInfo() {
-            let bookSelect = document.getElementById('book_id');
-            let selectedBook = bookSelect.options[bookSelect.selectedIndex];
-            let bookPrice = selectedBook.getAttribute('data-price') || 0;
-            document.getElementById('book_price').value = bookPrice;
-            calculateDue();
-        }
-
-        function calculateDue() {
-            let bookPrice = parseFloat(document.getElementById('book_price').value) || 0;
-            let amountPaid = parseFloat(document.getElementById('amount_paid').value) || 0;
-            let amountDue = Math.max(bookPrice - amountPaid, 0);
-            document.getElementById('amount_due').value = amountDue.toFixed(2);
-        }
-    </script>
 </body>
 
 </html>

@@ -117,9 +117,13 @@ VALUES (
 
 CREATE TABLE BookReservations (
     reservation_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(20) NOT NULL UNIQUE,
     student_id INT NOT NULL,
     teacher_id INT NULL,
     book_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    book_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
     reservation_date DATE NOT NULL DEFAULT(CURRENT_DATE),
     approved_date DATE NULL,
     status ENUM(
@@ -132,6 +136,8 @@ CREATE TABLE BookReservations (
     return_date DATE NULL,
     amount_paid DECIMAL(10, 2) NOT NULL DEFAULT 0,
     amount_due DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    payment_proof VARCHAR(255) NULL,
+    receipt_image VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,

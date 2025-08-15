@@ -281,8 +281,8 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                     <td><span class="badge bg-success"><?= $teacher['approved_reservations'] ?></span></td>
                                     <td><span class="badge bg-danger"><?= $teacher['cancelled_reservations'] ?></span></td>
                                     <td><span class="badge bg-info"><?= $teacher['returned_reservations'] ?></span></td>
-                                    <td><?= number_format($teacher['total_amount']) ?> ر.س</td>
-                                    <td><?= number_format($teacher['total_due']) ?> ر.س</td>
+                                    <td><?= number_format($teacher['total_amount']) ?> </td>
+                                    <td><?= number_format($teacher['total_due']) ?> </td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>

@@ -12,7 +12,6 @@ $today = date('Y-m-d');
 $result = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-// استعلام الإيرادات اليومية - يأخذ فقط الطلبات غير الملغاة وغير المرتجعة
 $stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
 $stmt->bind_param('s', $today);
 $stmt->execute();
@@ -21,7 +20,6 @@ $stmt->fetch();
 $stmt->close();
 
 $history = [];
-// تاريخ الإيرادات - يستثني الطلبات الملغاة والمرتجعة
 $result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status NOT IN ('cancelled', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
 while ($row = $result->fetch_assoc()) {
     $history[] = $row;
@@ -30,7 +28,6 @@ while ($row = $result->fetch_assoc()) {
 $result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-// إجمالي الكتب المباعة والإيرادات - يستثني الملغاة والمرتجعة
 $stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
@@ -60,6 +57,7 @@ $total_users = $result->fetch_assoc()['total_users'] ?? 0;
 $daily_records = [];
 $result = $mysqli->query("SELECT 
     br.reservation_id,
+    br.order_number,
     s.name AS student_name,
     s.phone AS student_phone,
     g.name AS grade_name,
@@ -67,6 +65,7 @@ $result = $mysqli->query("SELECT
     t.phone AS teacher_phone,
     b.title AS book_title,
     b.price AS book_price,
+    br.quantity,
     br.amount_paid,
     br.amount_due,
     br.status,
@@ -85,6 +84,7 @@ while ($row = $result->fetch_assoc()) {
 $all_records = [];
 $result = $mysqli->query("SELECT 
     br.reservation_id,
+    br.order_number,
     s.name AS student_name,
     s.phone AS student_phone,
     g.name AS grade_name,
@@ -92,6 +92,7 @@ $result = $mysqli->query("SELECT
     t.phone AS teacher_phone,
     b.title AS book_title,
     b.price AS book_price,
+    br.quantity,
     br.amount_paid,
     br.amount_due,
     br.status,
@@ -373,6 +374,7 @@ while ($row = $result->fetch_assoc()) {
                         </article>
                     </div>
 
+
                     <div
                         class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                         <div class="px-6 py-4">
@@ -387,14 +389,15 @@ while ($row = $result->fetch_assoc()) {
                             <table class="min-w-full">
                                 <thead>
                                     <tr class="bg-gray-50 dark:bg-gray-900">
-
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            رقم الطلب</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             اسم الطالب</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             رقم الهاتف</th>
-
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             المدرس</th>
@@ -406,37 +409,31 @@ while ($row = $result->fetch_assoc()) {
                                             السعر</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            الكمية</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            الإجمالي</th>
+                                        <th
+                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             المدفوع</th>
-
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             المتبقي</th>
-
-                                        <!-- <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            تاريخ الحجز</th> -->
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             وقت الحجز</th>
-
-
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             الحالة</th>
                                     </tr>
-
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                                     <?php foreach ($daily_records as $record): ?>
                                         <tr>
-
-
-
-
-
-
-
-
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= htmlspecialchars($record['order_number'] ?? '') ?>
+                                            </td>
                                             <td class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="flex items-center gap-3">
@@ -458,13 +455,10 @@ while ($row = $result->fetch_assoc()) {
                                                     </div>
                                                 </div>
                                             </td>
-
-
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                 <?= htmlspecialchars($record['student_phone'] ?? 'غير متوفر') ?>
                                             </td>
-
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                 <?= htmlspecialchars($record['teacher_name'] ?? 'غير محدد') ?>
@@ -480,6 +474,15 @@ while ($row = $result->fetch_assoc()) {
                                             </td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= htmlspecialchars($record['quantity'] ?? 1) ?>
+                                            </td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <?= number_format(($record['book_price'] ?? 0) * ($record['quantity'] ?? 1), 2) ?>
+                                                <sub style="font-size: x-small;">EG</sub>
+                                            </td>
+                                            <td
+                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                 <?= number_format($record['amount_paid'] ?? 0, 2) ?> <sub
                                                     style="font-size: x-small;">EG</sub>
                                             </td>
@@ -488,20 +491,10 @@ while ($row = $result->fetch_assoc()) {
                                                 <?= number_format($record['amount_due'] ?? 0, 2) ?> <sub
                                                     style="font-size: x-small;">EG</sub>
                                             </td>
-
-
-
-                                            <!-- <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= isset($record['created_at']) ? date('Y-m-d', strtotime($record['created_at'])) : '' ?>
-                                            </td> -->
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                 <?= isset($record['created_at']) ? date('h:i A', strtotime($record['created_at'])) : '' ?>
                                             </td>
-
-
-
                                             <td class="px-6 py-4 text-left">
                                                 <?php
                                                 $status = $record['status'] ?? 'pending';
@@ -520,13 +513,13 @@ while ($row = $result->fetch_assoc()) {
                                                 <span
                                                     class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium"><?= htmlspecialchars($status) ?></span>
                                             </td>
-
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
                     </div>
+
                 </div>
 
             </main>
