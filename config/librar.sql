@@ -91,6 +91,7 @@ CREATE TABLE Users (
     ) NOT NULL DEFAULT 'student',
     is_verified BOOLEAN DEFAULT FALSE,
     verification_token VARCHAR(255) NULL,
+    verification_code INT NULL,
     token_expiry DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -117,6 +118,7 @@ VALUES (
 CREATE TABLE BookReservations (
     reservation_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
+    teacher_id INT NULL,
     book_id INT NOT NULL,
     reservation_date DATE NOT NULL DEFAULT(CURRENT_DATE),
     approved_date DATE NULL,
@@ -135,6 +137,7 @@ CREATE TABLE BookReservations (
     deleted_at TIMESTAMP NULL,
     INDEX idx_deleted_at (deleted_at),
     FOREIGN KEY (student_id) REFERENCES Students (student_id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES Teachers (teacher_id) ON DELETE SET NULL,
     FOREIGN KEY (book_id) REFERENCES Books (book_id) ON DELETE CASCADE
 );
 

@@ -124,6 +124,7 @@ $result = $mysqli->query("SELECT grade_id, name, description, created_at, update
                                 </div>
                             </div>
 
+
                             <div class="max-w-full overflow-x-auto custom-scrollbar">
                                 <table class="min-w-full">
                                     <thead
@@ -133,48 +134,50 @@ $result = $mysqli->query("SELECT grade_id, name, description, created_at, update
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        المعرف
-                                                    </p>
+                                                        المعرف</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        اسم المرحلة
-                                                    </p>
+                                                        اسم المرحلة</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الوصف
-                                                    </p>
+                                                        الوصف</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        تاريخ الإضافة
-                                                    </p>
+                                                        تاريخ الإضافة</p>
+                                                </div>
+                                            </th>
+
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        وقت الإضافة</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        آخر تعديل
-                                                    </p>
+                                                        آخر تعديل</p>
                                                 </div>
                                             </th>
                                             <th class="px-6 py-3 whitespace-nowrap">
                                                 <div class="flex items-center justify-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        إجراءات
-                                                    </p>
+                                                        إجراءات</p>
                                                 </div>
                                             </th>
                                         </tr>
@@ -201,12 +204,25 @@ $result = $mysqli->query("SELECT grade_id, name, description, created_at, update
                                                     </td>
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
-                                                            <?= date('Y-m-d H:i', strtotime($grade['created_at'])) ?>
+                                                            <?= date('Y-m-d', strtotime($grade['created_at'])) ?><br>
                                                         </p>
                                                     </td>
+
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
-                                                            <?= $grade['updated_at'] ? date('Y-m-d H:i', strtotime($grade['updated_at'])) : 'لم يتم التعديل' ?>
+                                                            <?= date('h:i A', strtotime($grade['created_at'])) ?>
+                                                        </p>
+                                                    </td>
+
+
+                                                    <td class="px-6 py-3 whitespace-nowrap">
+                                                        <p class="text-gray-700 text-theme-sm dark:text-gray-400">
+                                                            <?php if ($grade['updated_at']): ?>
+                                                                <?= date('Y-m-d', strtotime($grade['updated_at'])) ?><br>
+                                                                <!-- <?= date('h:i A', strtotime($grade['updated_at'])) ?> -->
+                                                            <?php else: ?>
+                                                                لم يتم التعديل
+                                                            <?php endif; ?>
                                                         </p>
                                                     </td>
                                                     <td class="px-6 py-3 whitespace-nowrap">
@@ -252,6 +268,7 @@ $result = $mysqli->query("SELECT grade_id, name, description, created_at, update
                                     </tbody>
                                 </table>
                             </div>
+
                         </div>
                     </div>
                 </div>

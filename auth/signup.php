@@ -19,6 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die('فشل التحقق من CSRF token');
     }
+
     $username = htmlspecialchars(trim($_POST['username'] ?? ''), ENT_QUOTES, 'UTF-8');
     $email = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'] ?? '';
@@ -49,41 +50,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($exists > 0) {
             $message = "اسم المستخدم أو البريد الإلكتروني موجود بالفعل.";
         } else {
-            $_SESSION['reg_username'] = $username;
-            $_SESSION['reg_email'] = $email;
             $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-            $_SESSION['reg_password'] = $hashed_password;
+            $verification_code = random_int(100000, 999999);
+            $verification_token = bin2hex(random_bytes(32));
 
-            $verification_code = rand(100000, 999999);
-            $_SESSION['verification_code'] = $verification_code;
-            $_SESSION['verification_attempts'] = 0;
-            $_SESSION['verification_time'] = time();
-
-            $mail = new PHPMailer(true);
-
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'ammar132004@gmail.com';
-                $mail->Password = 'liucpvijkorozodu';
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port = 587;
-                $mail->CharSet = 'UTF-8';
-
-                $mail->setFrom('ammar132004@gmail.com', 'موقعك');
-                $mail->addAddress($email);
-
-                $mail->isHTML(true);
-                $mail->Subject = 'رمز التحقق للتسجيل';
-                $mail->Body = "رمز التحقق الخاص بك هو: <b>$verification_code</b>";
-
-                $mail->send();
-                header("Location: verify.php");
-                exit();
-            } catch (Exception $e) {
-                $message = "تعذر إرسال البريد الإلكتروني. يرجى المحاولة لاحقًا.";
+            $stmt = $mysqli->prepare("INSERT INTO Users (username, email, password_hash, role, is_verified, verification_token, verification_code) VALUES (?, ?, ?, 'student', FALSE, ?, ?)");
+            if ($stmt === false) {
+                die('فشل التحضير: ' . htmlspecialchars($mysqli->error));
             }
+
+            $stmt->bind_param("ssssi", $username, $email, $hashed_password, $verification_token, $verification_code);
+
+            if ($stmt->execute()) {
+                $_SESSION['reg_email'] = $email;
+                $_SESSION['verification_code'] = $verification_code;
+                $_SESSION['verification_attempts'] = 0;
+                $_SESSION['verification_time'] = time();
+
+                $mail = new PHPMailer(true);
+
+                try {
+                    $mail->isSMTP();
+                    $mail->Host = 'smtp.gmail.com';
+                    $mail->SMTPAuth = true;
+                    $mail->Username = 'ammar132004@gmail.com';
+                    $mail->Password = 'liucpvijkorozodu';
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    $mail->Port = 587;
+                    $mail->CharSet = 'UTF-8';
+
+                    $mail->setFrom('ammar132004@gmail.com', 'موقعك');
+                    $mail->addAddress($email);
+
+                    $mail->isHTML(true);
+                    $mail->Subject = 'رمز التحقق لتسجيل الحساب';
+                    $mail->Body = "
+                        <h3>مرحباً {$username}</h3>
+                        <p>رمز التحقق الخاص بك هو: <strong>{$verification_code}</strong></p>
+                        <p>الرجاء إدخال هذا الرمز في صفحة التحقق لتفعيل حسابك.</p>
+                    ";
+
+                    $mail->send();
+                    header("Location: verify.php");
+                    exit();
+                } catch (Exception $e) {
+                    $message = "تعذر إرسال البريد الإلكتروني. يرجى المحاولة لاحقًا.";
+                    $mysqli->query("DELETE FROM Users WHERE email = '" . $mysqli->real_escape_string($email) . "'");
+                }
+            } else {
+                $message = "حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة لاحقًا.";
+            }
+            $stmt->close();
         }
     }
 }

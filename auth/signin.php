@@ -10,44 +10,67 @@ $message = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die('CSRF token validation failed');
+        die('فشل التحقق من الأمان');
     }
 
     $username_email = trim($_POST['username_email'] ?? '');
     $password = $_POST['password'] ?? '';
 
     if (empty($username_email) || empty($password)) {
-        $message = "يرجى ملء جميع الحقول.";
+        $message = "يرجى ملء جميع الحقول";
     } else {
-        $stmt = $mysqli->prepare("SELECT user_id, username, password_hash, role FROM Users WHERE (username = ? OR email = ?) AND deleted_at IS NULL LIMIT 1");
+        $stmt = $mysqli->prepare("
+            SELECT user_id, username, email, password_hash, role, is_verified 
+            FROM Users 
+            WHERE (username = ? OR email = ?) 
+            AND deleted_at IS NULL 
+            LIMIT 1
+        ");
+
         if ($stmt === false) {
-            die('Prepare failed: ' . htmlspecialchars($mysqli->error));
+            die('خطأ في النظام');
         }
+
         $stmt->bind_param("ss", $username_email, $username_email);
         $stmt->execute();
         $result = $stmt->get_result();
 
-        if ($result->num_rows === 1) {
+        if ($result && $result->num_rows === 1) {
             $user = $result->fetch_assoc();
             $stmt->close();
 
             if (password_verify($password, $user['password_hash'])) {
-                session_regenerate_id(true);
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['last_activity'] = time();
+                if (!$user['is_verified']) {
+                    $message = "الحساب غير مفعل. يرجى التحقق من بريدك الإلكتروني";
+                } else {
+                    session_regenerate_id(true);
+                    $_SESSION['user_id'] = $user['user_id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['email'] = $user['email'];
+                    $_SESSION['role'] = $user['role'];
+                    $_SESSION['last_activity'] = time();
+                    $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
+                    $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
 
-                header("Location: ../index.php");
-                exit();
+                    header("Location: ../index.php");
+                    exit();
+                }
+            } else {
+                $message = "بيانات الدخول غير صحيحة";
             }
+        } else {
+            $message = "بيانات الدخول غير صحيحة";
         }
 
-        $message = "اسم المستخدم أو كلمة المرور غير صحيحة.";
+        if ($stmt) {
+            $stmt->close();
+        }
+
         sleep(1);
     }
 }
 ?>
+
 
 <!doctype html>
 <html lang="en">
@@ -158,6 +181,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <form method="POST" action="">
                             <input type="hidden" name="csrf_token"
                                 value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+
                             <div class="space-y-5">
                                 <div>
                                     <label

@@ -1,54 +1,52 @@
 <?php
 session_start();
+require('../config/db.php');
 $error_message = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user_code = trim($_POST['code'] ?? '');
 
     if (empty($user_code)) {
-        $error_message = "Please enter the verification code.";
-    } elseif (!isset($_SESSION['verification_code'])) {
-        $error_message = "No verification code found. Please register again.";
+        $error_message = "الرجاء إدخال رمز التحقق.";
     } else {
-        $session_code = (string) $_SESSION['verification_code'];
-        $user_code_str = (string) $user_code;
+        $email = $_SESSION['reg_email'] ?? '';
 
-        if (!hash_equals($session_code, $user_code_str)) {
-            $error_message = "Incorrect verification code.";
+        if (empty($email)) {
+            $error_message = "انتهت الجلسة. الرجاء التسجيل مرة أخرى.";
         } else {
-            require('../config/db.php');
-
-            $username = $_SESSION['reg_username'] ?? '';
-            $email = $_SESSION['reg_email'] ?? '';
-            $password = $_SESSION['reg_password'] ?? '';
-
-            if (empty($username) || empty($email) || empty($password)) {
-                $error_message = "Session expired. Please register again.";
-            } else {
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $mysqli->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
-                if ($stmt) {
-                    $stmt->bind_param("sss", $username, $email, $password_hash);
-                    if ($stmt->execute()) {
-                        $to = "admin@example.com";
-                        $subject = "New User Registration - Permission Required";
-                        $message = "A new user has registered:\n\nUsername: $username\nEmail: $email\n\nPlease review and grant appropriate access permissions in the admin panel.";
-                        $headers = "From: noreply@example.com";
-                        mail($to, $subject, $message, $headers);
-
-                        unset($_SESSION['reg_username'], $_SESSION['reg_email'], $_SESSION['reg_password'], $_SESSION['verification_code']);
-                        session_regenerate_id(true);
-                        header("Location: signin.php");
-                        exit();
-                    } else {
-                        $error_message = "Error registering user.";
-                    }
-                    $stmt->close();
-                } else {
-                    $error_message = "Database error.";
-                }
+            $stmt = $mysqli->prepare("SELECT verification_code FROM Users WHERE email = ?");
+            if ($stmt === false) {
+                die('فشل التحضير: ' . htmlspecialchars($mysqli->error));
             }
-            $mysqli->close();
+
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $stmt->bind_result($db_code);
+            $stmt->fetch();
+            $stmt->close();
+
+            if (empty($db_code)) {
+                $error_message = "لم يتم العثور على رمز تحقق. الرجاء التسجيل مرة أخرى.";
+            } elseif ((string) $user_code !== (string) $db_code) {
+                $error_message = "رمز التحقق غير صحيح.";
+            } else {
+                $update_stmt = $mysqli->prepare("UPDATE Users SET is_verified = TRUE, verification_code = NULL WHERE email = ?");
+                if ($update_stmt === false) {
+                    die('فشل التحضير: ' . htmlspecialchars($mysqli->error));
+                }
+
+                $update_stmt->bind_param("s", $email);
+
+                if ($update_stmt->execute()) {
+                    unset($_SESSION['reg_email'], $_SESSION['verification_code']);
+                    session_regenerate_id(true);
+                    header("Location: signin.php");
+                    exit();
+                } else {
+                    $error_message = "خطأ في تحديث حالة التحقق.";
+                }
+                $update_stmt->close();
+            }
         }
     }
 }

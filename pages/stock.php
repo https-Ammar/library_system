@@ -390,12 +390,16 @@ $stats = $stats_result->fetch_assoc();
                                     x-transition:leave-end="opacity-0 scale-95"
                                     class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999"
                                     :class="{'hidden': !editModalOpen}">
+
+                                    <!-- الخلفية -->
                                     <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
                                         @click="editModalOpen = false">
                                     </div>
 
+                                    <!-- نافذة التعديل -->
                                     <div @click.outside="editModalOpen = false"
                                         class="no-scrollbar relative w-full max-w-[700px] mx-auto overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
+
                                         <div class="px-2">
                                             <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
                                                 تعديل الكتب الدراسية
@@ -405,11 +409,14 @@ $stats = $stats_result->fetch_assoc();
                                             </p>
                                         </div>
 
-                                        <form method="POST" class="flex flex-col" x-data="{ currentBook: currentBook }">
+                                        <!-- فورم التعديل -->
+                                        <form method="POST" class="flex flex-col">
                                             <input type="hidden" name="book_id" x-model="currentBook.book_id">
 
                                             <div class="custom-scrollbar overflow-y-auto px-2">
                                                 <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+
+                                                    <!-- الكمية -->
                                                     <div class="sm:col-span-2">
                                                         <label
                                                             class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -417,11 +424,12 @@ $stats = $stats_result->fetch_assoc();
                                                         </label>
                                                         <input type="number" name="quantity"
                                                             x-model="currentBook.quantity" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                       text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                       focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                       dark:text-white/90">
+                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                                   dark:text-white/90">
                                                     </div>
 
+                                                    <!-- السعر -->
                                                     <div class="sm:col-span-2">
                                                         <label
                                                             class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -429,50 +437,52 @@ $stats = $stats_result->fetch_assoc();
                                                         </label>
                                                         <input type="number" step="0.01" name="price"
                                                             x-model="currentBook.price" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                       text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                       focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                       dark:text-white/90">
+                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                                   dark:text-white/90">
                                                     </div>
 
+                                                    <!-- الصف -->
                                                     <div class="sm:col-span-2">
                                                         <label
                                                             class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                                                             الصف
                                                         </label>
-                                                        <select name="grade_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
-                                       text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
-                                       focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
-                                       dark:text-white/90">
+                                                        <select name="grade_id" x-model="currentBook.grade_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 
+                                   text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 
+                                   focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 
+                                   dark:text-white/90">
                                                             <?php $grades_result->data_seek(0); ?>
                                                             <?php while ($grade = $grades_result->fetch_assoc()): ?>
-                                                                <option value="<?= $grade['grade_id'] ?>"
-                                                                    x-bind:selected="currentBook.grade_id == <?= $grade['grade_id'] ?>">
+                                                                <option value="<?= $grade['grade_id'] ?>">
                                                                     <?= htmlspecialchars($grade['name']) ?>
                                                                 </option>
                                                             <?php endwhile; ?>
                                                         </select>
                                                     </div>
+
                                                 </div>
                                             </div>
 
+                                            <!-- الأزرار -->
                                             <div
                                                 class="flex flex-col items-center gap-6 px-2 mt-6 sm:flex-row sm:justify-between">
                                                 <div class="flex items-center w-full gap-3 sm:w-auto">
                                                     <button type="button" @click="editModalOpen = false" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 
-                                   text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 
-                                   dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
+                               text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 
+                               dark:bg-gray-800 dark:text-gray-400 sm:w-auto">
                                                         إلغاء
                                                     </button>
                                                     <button type="submit" name="update" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm 
-                                   font-medium text-white hover:bg-brand-600 sm:w-auto">
+                               font-medium text-white hover:bg-brand-600 sm:w-auto">
                                                         حفظ التغييرات
                                                     </button>
                                                 </div>
                                             </div>
+
                                         </form>
                                     </div>
                                 </div>
-
 
 
                                 <div id="finished" class="tabcontent" style="display: none;">
