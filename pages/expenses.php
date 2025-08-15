@@ -62,12 +62,19 @@ $result->free();
         </div>
     </div>
 
+
+
     <div class="flex h-screen overflow-hidden">
+        <?php require('../includes/header.php'); ?>
         <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
 
+
             <main>
+                <?php require('../includes/nav.php'); ?>
+
+
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
                     <div class="col-span-12">
                         <div
@@ -129,11 +136,8 @@ $result->free();
                                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                                         <?php if (empty($expenses)): ?>
                                             <tr>
-                                                <td class="px-6 py-3 whitespace-nowrap" colspan="4">
-                                                    <span
-                                                        class="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-                                                        لا توجد مصروفات مسجلة.
-                                                    </span>
+                                                <td colspan="7" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                    لا توجد بيانات للعرض
                                                 </td>
                                             </tr>
                                         <?php else: ?>

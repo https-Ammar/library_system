@@ -140,7 +140,7 @@ while ($row = $result->fetch_assoc()) {
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
 
-                
+
             <main>
                 <?php require('./includes/nav.php'); ?>
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
@@ -526,14 +526,7 @@ while ($row = $result->fetch_assoc()) {
                         </div>
                     </div>
                 </div>
-                <br>
-                <div
-                    class=" text-center z-50 p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-l border-gray-200 dark:border-gray-800 rounded-tl-lg text-xs text-gray-600 dark:text-gray-400">
-                    <br>
-                    Developed by <span class="font-medium text-primary-600 dark:text-primary-400">eng - Ammar
-                        Ahmed</span> &copy;
-                    <span x-text="new Date().getFullYear()"></span>
-                </div>
+
             </main>
 
 
@@ -542,7 +535,7 @@ while ($row = $result->fetch_assoc()) {
             <script defer src="./assets/js/bundle.js"></script>
         </div>
     </div>
-    
+
     <style>
         .flex.h-screen.overflow-hidden {
             direction: rtl;

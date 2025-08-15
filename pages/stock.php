@@ -373,9 +373,10 @@ $stats = $stats_result->fetch_assoc();
                                                 <?php endwhile; ?>
                                             <?php else: ?>
                                                 <tr>
-                                                    <td colspan="8"
-                                                        class="text-center py-3 font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        لا توجد كتب متاحة للعرض</td>
+                                                    <td colspan="7"
+                                                        class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                        لا توجد بيانات للعرض
+                                                    </td>
                                                 </tr>
                                             <?php endif; ?>
                                         </tbody>
@@ -628,9 +629,10 @@ $stats = $stats_result->fetch_assoc();
                                                 <?php endwhile; ?>
                                             <?php else: ?>
                                                 <tr>
-                                                    <td colspan="8"
-                                                        class="text-center py-3 font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        لا توجد كتب منتهية للعرض</td>
+                                                    <td colspan="7"
+                                                        class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                        لا توجد بيانات للعرض
+                                                    </td>
                                                 </tr>
                                             <?php endif; ?>
                                         </tbody>

@@ -242,7 +242,6 @@ ORDER BY s.name
 
 $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_at IS NULL ORDER BY name");
 ?>
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
@@ -265,6 +264,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
     x-init="darkMode = JSON.parse(localStorage.getItem('darkMode')); 
             $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
     :class="{'dark bg-gray-900': darkMode === true}">
+
     <div x-show="loaded" x-transition.opacity
         x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
         class="fixed inset-0 z-999999 flex items-center justify-center bg-white dark:bg-black">
@@ -272,12 +272,18 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
         </div>
     </div>
 
+
+
     <div class="flex h-screen overflow-hidden">
+        <?php require('../includes/header.php'); ?>
         <div class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
 
+
+
             <main>
+                <?php require('../includes/nav.php'); ?>
 
 
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
@@ -657,7 +663,9 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                 </tr>
                                             <?php endwhile; else: ?>
                                             <tr>
-                                                <td colspan="11" class="text-center py-4">لا توجد حجوزات</td>
+                                                <td colspan="11" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                    لا توجد بيانات للعرض
+                                                </td>
                                             </tr>
                                         <?php endif; ?>
                                     </tbody>

@@ -258,11 +258,11 @@ $result = $mysqli->query("SELECT grade_id, name, description, created_at, update
                                             <?php endwhile; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="6" class="px-6 py-3 text-center">
-                                                    <p class="text-gray-700 text-theme-sm dark:text-gray-400">
-                                                        لا توجد بيانات للعرض
-                                                    </p>
+                                            <tr>
+                                                <td colspan="7" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                    لا توجد بيانات للعرض
                                                 </td>
+                                            </tr>
                                             </tr>
                                         <?php endif; ?>
                                     </tbody>

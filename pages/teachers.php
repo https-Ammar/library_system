@@ -331,7 +331,8 @@ if (isset($_GET['search'])) {
                                                         $stmt_books->close();
                                                         ?>
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
-                                                            <?= $books_count ?> كتاب</p>
+                                                            <?= $books_count ?> كتاب
+                                                        </p>
                                                     </td>
                                                     <td class="px-6 py-3 whitespace-nowrap">
                                                         <div class="flex items-center justify-center gap-3">
@@ -354,9 +355,9 @@ if (isset($_GET['search'])) {
                                             <?php endwhile; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="7"
-                                                    class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">لا توجد
-                                                    بيانات</td>
+                                                <td colspan="7" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                    لا توجد بيانات للعرض
+                                                </td>
                                             </tr>
                                         <?php endif; ?>
 
