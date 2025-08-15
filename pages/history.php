@@ -1,36 +1,72 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ./auth/signin.php");
+    exit();
+}
+
 require_once '../config/db.php';
 
 $today = date('Y-m-d');
 
-$dates_result = $mysqli->query("SELECT DISTINCT DATE(created_at) as date FROM BookReservations WHERE deleted_at IS NULL ORDER BY DATE(created_at) DESC");
+$dates_result = $mysqli->query("
+    SELECT DISTINCT DATE(created_at) AS date 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL 
+    ORDER BY DATE(created_at) DESC
+");
 $dates = [];
 while ($row = $dates_result->fetch_assoc()) {
     $dates[] = $row['date'];
 }
 
 $selected_date = $_GET['date'] ?? $today;
-$all_records = [];
 
-$stmt = $mysqli->prepare("SELECT 
-    br.reservation_id,
-    s.name AS student_name,
-    s.phone AS student_phone,
-    g.name AS grade_name,
-    t.name AS teacher_name,
-    b.title AS book_title,
-    b.price AS book_price,
-    br.amount_paid,
-    (b.price - br.amount_paid) AS amount_due,
-    br.status,
-    br.created_at
-FROM BookReservations br
-JOIN Students s ON br.student_id = s.student_id
-JOIN Books b ON br.book_id = b.book_id
-LEFT JOIN Grades g ON s.grade_id = g.grade_id
-LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
-WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
-ORDER BY br.created_at DESC");
+$stmt = $mysqli->prepare("
+    SELECT COUNT(*) AS today_orders 
+    FROM BookReservations 
+    WHERE DATE(created_at) = ? AND deleted_at IS NULL
+");
+$stmt->bind_param('s', $selected_date);
+$stmt->execute();
+$stmt->bind_result($today_orders);
+$stmt->fetch();
+$stmt->close();
+
+$stmt = $mysqli->prepare("
+    SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue 
+    FROM BookReservations 
+    WHERE DATE(created_at) = ? AND deleted_at IS NULL 
+    AND status NOT IN ('cancelled', 'returned')
+");
+$stmt->bind_param('s', $selected_date);
+$stmt->execute();
+$stmt->bind_result($today_revenue);
+$stmt->fetch();
+$stmt->close();
+
+$all_records = [];
+$stmt = $mysqli->prepare("
+    SELECT 
+        br.reservation_id,
+        s.name AS student_name,
+        s.phone AS student_phone,
+        g.name AS grade_name,
+        t.name AS teacher_name,
+        b.title AS book_title,
+        b.price AS book_price,
+        br.amount_paid,
+        (b.price - br.amount_paid) AS amount_due,
+        br.status,
+        br.created_at
+    FROM BookReservations br
+    JOIN Students s ON br.student_id = s.student_id
+    JOIN Books b ON br.book_id = b.book_id
+    LEFT JOIN Grades g ON s.grade_id = g.grade_id
+    LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+    WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
+    ORDER BY br.created_at DESC
+");
 $stmt->bind_param('s', $selected_date);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -39,24 +75,32 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-$today_orders = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$selected_date' AND deleted_at IS NULL")->fetch_assoc()['today_orders'] ?? 0;
+$result = $mysqli->query("
+    SELECT COUNT(*) AS total_orders 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL
+");
+$total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status IN ('approved', 'returned')");
-$stmt->bind_param('s', $selected_date);
-$stmt->execute();
-$stmt->bind_result($today_revenue);
-$stmt->fetch();
-$stmt->close();
-
-$total_orders = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL")->fetch_assoc()['total_orders'] ?? 0;
-
-$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status IN ('approved', 'returned')");
+$stmt = $mysqli->prepare("
+    SELECT COUNT(*) AS total_books_sold, 
+           COALESCE(SUM(amount_paid), 0) AS total_revenue 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL 
+    AND status NOT IN ('cancelled', 'returned')
+");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $mysqli->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE DATE(created_at) = '$selected_date' AND deleted_at IS NULL GROUP BY status");
+$result = $mysqli->query("
+    SELECT status, COUNT(*) AS count 
+    FROM BookReservations 
+    WHERE DATE(created_at) = '$selected_date' 
+    AND deleted_at IS NULL 
+    GROUP BY status
+");
 $order_status_counts = [
     'pending' => 0,
     'approved' => 0,
@@ -67,10 +111,25 @@ while ($row = $result->fetch_assoc()) {
     $order_status_counts[$row['status']] = $row['count'];
 }
 
-$total_expenses = $mysqli->query("SELECT SUM(amount) AS total_expenses FROM Expenses WHERE deleted_at IS NULL")->fetch_assoc()['total_expenses'] ?? 0;
-$total_students = $mysqli->query("SELECT COUNT(*) AS total_students FROM Students WHERE deleted_at IS NULL")->fetch_assoc()['total_students'] ?? 0;
-$total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE deleted_at IS NULL")->fetch_assoc()['total_users'] ?? 0;
+$total_expenses = $mysqli->query("
+    SELECT SUM(amount) AS total_expenses 
+    FROM Expenses 
+    WHERE deleted_at IS NULL
+")->fetch_assoc()['total_expenses'] ?? 0;
+
+$total_students = $mysqli->query("
+    SELECT COUNT(*) AS total_students 
+    FROM Students 
+    WHERE deleted_at IS NULL
+")->fetch_assoc()['total_students'] ?? 0;
+
+$total_users = $mysqli->query("
+    SELECT COUNT(*) AS total_users 
+    FROM Users 
+    WHERE deleted_at IS NULL
+")->fetch_assoc()['total_users'] ?? 0;
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -440,7 +499,7 @@ $total_users = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE d
                                                     } elseif ($status == 'cancelled') {
                                                         $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
                                                     } elseif ($status == 'returned') {
-                                                        $status_class = 'bg-info-50 text-info-600 dark:bg-info-500/15 dark:text-info-500';
+                                                        $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
                                                     }
                                                     ?>
                                                     <span

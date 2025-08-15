@@ -103,9 +103,9 @@ $stats_stmt->close();
                     <div class="flex w-full flex-col items-center gap-6 xl:flex-row">
                         <div class="h-20 w-20 overflow-hidden rounded-full border border-gray-200 dark:border-gray-800">
                             <?php if (!empty($teacher['image_url'])): ?>
-                                <img src="<?= htmlspecialchars($teacher['image_url']) ?>" alt="user">
+                                    <img src="<?= htmlspecialchars($teacher['image_url']) ?>" alt="user">
                             <?php else: ?>
-                                <span class="text-muted">لا توجد صورة</span>
+                                    <span class="text-muted">لا توجد صورة</span>
                             <?php endif; ?>
                         </div>
                         <div class="order-3 xl:order-2">
@@ -126,14 +126,14 @@ $stats_stmt->close();
                         </div>
                         <div class="order-2 flex grow items-center gap-2 xl:order-3 xl:justify-end">
                             <?php if ($grades->num_rows > 0): ?>
-                                <?php while ($grade = $grades->fetch_assoc()): ?>
-                                    <button
-                                        class="p-3 shadow-theme-xs flex items-center justify-center gap-2 rounded-full border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-                                        <?= htmlspecialchars($grade['name']) ?>
-                                    </button>
-                                <?php endwhile; ?>
+                                    <?php while ($grade = $grades->fetch_assoc()): ?>
+                                            <button
+                                                class="p-3 shadow-theme-xs flex items-center justify-center gap-2 rounded-full border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                                                <?= htmlspecialchars($grade['name']) ?>
+                                            </button>
+                                    <?php endwhile; ?>
                             <?php else: ?>
-                                <p class="text-muted">لا توجد مراحل دراسية مرتبطة</p>
+                                    <p class="text-muted">لا توجد مراحل دراسية مرتبطة</p>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -254,217 +254,217 @@ $stats_stmt->close();
             </div>
 
             <?php if ($books->num_rows > 0): ?>
-                <div class="col-span-12 xl:col-span-7 mt-6">
-                    <div
-                        class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pt-4 pb-3 sm:px-6 dark:border-gray-800 dark:bg-white/[0.03]">
-                        <div class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
-                                    الكتب المرتبطة
-                                </h3>
+                    <div class="col-span-12 xl:col-span-7 mt-6">
+                        <div
+                            class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pt-4 pb-3 sm:px-6 dark:border-gray-800 dark:bg-white/[0.03]">
+                            <div class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+                                        الكتب المرتبطة
+                                    </h3>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <button onclick="openTab(event, 'available')"
+                                        class="tablinks text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 active">
+                                        الكتب المتاحة
+                                    </button>
+
+                                    <button onclick="openTab(event, 'finished')"
+                                        class="tablinks text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                                        الكتب المنتهية
+                                    </button>
+                                </div>
                             </div>
 
-                            <div class="flex items-center gap-3">
-                                <button onclick="openTab(event, 'available')"
-                                    class="tablinks text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 active">
-                                    الكتب المتاحة
-                                </button>
-
-                                <button onclick="openTab(event, 'finished')"
-                                    class="tablinks text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-                                    الكتب المنتهية
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="max-w-full overflow-x-auto custom-scrollbar">
-                            <div id="available" class="tabcontent" style="display: block;">
-                                <table class="min-w-full">
-                                    <thead class="border-gray-100 border-y dark:border-gray-800">
-                                        <tr>
-                                            <th class="px-6 py-3 whitespace-nowrap first:pl-0">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الصورة</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الكتاب</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الصف</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الكمية</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        السعر</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الحجوزات</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        تاريخ الإضافة</p>
-                                                </div>
-                                            </th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody class="py-3 divide-y divide-gray-100 dark:divide-gray-800">
-                                        <?php while ($book = $books->fetch_assoc()): ?>
+                            <div class="max-w-full overflow-x-auto custom-scrollbar">
+                                <div id="available" class="tabcontent" style="display: block;">
+                                    <table class="min-w-full">
+                                        <thead class="border-gray-100 border-y dark:border-gray-800">
                                             <tr>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                <th class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                     <div class="flex items-center">
-                                                        <div class="flex items-center gap-3">
-                                                            <?php if (!empty($book['image_url'])): ?>
-                                                                <div class="h-[50px] w-[50px] overflow-hidden rounded-md">
-                                                                    <img src="<?= htmlspecialchars($book['image_url']) ?>"
-                                                                        alt="صورة الكتاب">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الصورة</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الكتاب</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الصف</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الكمية</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            السعر</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الحجوزات</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            تاريخ الإضافة</p>
+                                                    </div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody class="py-3 divide-y divide-gray-100 dark:divide-gray-800">
+                                            <?php while ($book = $books->fetch_assoc()): ?>
+                                                    <tr>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <div class="flex items-center gap-3">
+                                                                    <?php if (!empty($book['image_url'])): ?>
+                                                                            <div class="h-[50px] w-[50px] overflow-hidden rounded-md">
+                                                                                <img src="<?= htmlspecialchars($book['image_url']) ?>"
+                                                                                    alt="صورة الكتاب">
+                                                                            </div>
+                                                                    <?php else: ?>
+                                                                            <span class="text-muted">لا توجد صورة</span>
+                                                                    <?php endif; ?>
                                                                 </div>
-                                                            <?php else: ?>
-                                                                <span class="text-muted">لا توجد صورة</span>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                                                                    <?= htmlspecialchars($book['title'] ?? '—') ?>
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    <?= htmlspecialchars($book['grade_name'] ?? '—') ?>
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    <?= isset($book['quantity']) ? htmlspecialchars($book['quantity']) : '0' ?>
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    <?= isset($book['price']) ? htmlspecialchars($book['price']) . ' ' : '—' ?>
+                                                                    <sub style="font-size: x-small;">EG</sub>
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    (<?= $book['approved_reservations'] ?? 0 ?> مقبولة /
+                                                                    <?= $book['pending_reservations'] ?? 0 ?> معلقة /
+                                                                    <?= $book['returned_reservations'] ?? 0 ?> مرتجعة)
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                            <div class="flex items-center">
+                                                                <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                                    <?= !empty($book['created_at']) ? date('Y-m-d', strtotime($book['created_at'])) : '—' ?>
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                            <?php endwhile; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="finished" class="tabcontent" style="display: none;">
+                                    <table class="min-w-full">
+                                        <thead class="border-gray-100 border-y dark:border-gray-800">
+                                            <tr>
+                                                <th class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                     <div class="flex items-center">
-                                                        <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                                                            <?= htmlspecialchars($book['title'] ?? '—') ?>
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الصورة</p>
                                                     </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            <?= htmlspecialchars($book['grade_name'] ?? '—') ?>
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الكتاب</p>
                                                     </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            <?= isset($book['quantity']) ? htmlspecialchars($book['quantity']) : '0' ?>
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الصف</p>
                                                     </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            <?= isset($book['price']) ? htmlspecialchars($book['price']) . ' ' : '—' ?>
-                                                            <sub style="font-size: x-small;">EG</sub>
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            المدرس</p>
                                                     </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            (<?= $book['approved_reservations'] ?? 0 ?> مقبولة /
-                                                            <?= $book['pending_reservations'] ?? 0 ?> معلقة /
-                                                            <?= $book['returned_reservations'] ?? 0 ?> مرتجعة)
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            الكمية</p>
                                                     </div>
-                                                </td>
-                                                <td class="px-6 py-3 whitespace-nowrap first:pl-0">
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            <?= !empty($book['created_at']) ? date('Y-m-d', strtotime($book['created_at'])) : '—' ?>
-                                                        </p>
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            السعر</p>
                                                     </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            تاريخ الحذف</p>
+                                                    </div>
+                                                </th>
+                                                <th class="px-6 py-3 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                            إجراءات</p>
+                                                    </div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody class="py-3 divide-y divide-gray-100 dark:divide-gray-800">
+                                            <tr>
+                                                <td colspan="8"
+                                                    class="text-center py-3 font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                    لا توجد كتب منتهية للعرض
                                                 </td>
                                             </tr>
-                                        <?php endwhile; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div id="finished" class="tabcontent" style="display: none;">
-                                <table class="min-w-full">
-                                    <thead class="border-gray-100 border-y dark:border-gray-800">
-                                        <tr>
-                                            <th class="px-6 py-3 whitespace-nowrap first:pl-0">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الصورة</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الكتاب</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الصف</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        المدرس</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        الكمية</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        السعر</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        تاريخ الحذف</p>
-                                                </div>
-                                            </th>
-                                            <th class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        إجراءات</p>
-                                                </div>
-                                            </th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody class="py-3 divide-y divide-gray-100 dark:divide-gray-800">
-                                        <tr>
-                                            <td colspan="8"
-                                                class="text-center py-3 font-medium text-gray-500 text-theme-xs dark:text-gray-400">
-                                                لا توجد كتب منتهية للعرض
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
             <?php else: ?>
-                <p class="text-muted">لا توجد كتب مرتبطة</p>
+                    <p class="text-muted">لا توجد كتب مرتبطة</p>
             <?php endif; ?>
 
             <script>

@@ -12,7 +12,8 @@ $today = date('Y-m-d');
 $result = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status IN ('approved', 'returned')");
+// استعلام الإيرادات اليومية - يأخذ فقط الطلبات غير الملغاة وغير المرتجعة
+$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
 $stmt->bind_param('s', $today);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
@@ -20,7 +21,8 @@ $stmt->fetch();
 $stmt->close();
 
 $history = [];
-$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status IN ('approved', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
+// تاريخ الإيرادات - يستثني الطلبات الملغاة والمرتجعة
+$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status NOT IN ('cancelled', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
 while ($row = $result->fetch_assoc()) {
     $history[] = $row;
 }
@@ -28,7 +30,8 @@ while ($row = $result->fetch_assoc()) {
 $result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status IN ('approved', 'returned')");
+// إجمالي الكتب المباعة والإيرادات - يستثني الملغاة والمرتجعة
+$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
@@ -104,7 +107,6 @@ while ($row = $result->fetch_assoc()) {
     $all_records[] = $row;
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -512,7 +514,7 @@ while ($row = $result->fetch_assoc()) {
                                                 } elseif ($status == 'cancelled') {
                                                     $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
                                                 } elseif ($status == 'returned') {
-                                                    $status_class = 'bg-info-50 text-info-600 dark:bg-info-500/15 dark:text-info-500';
+                                                    $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
                                                 }
                                                 ?>
                                                 <span
