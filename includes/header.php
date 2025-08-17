@@ -26,7 +26,7 @@
                             <ul :class="sidebarToggle ? 'xl:hidden' : 'flex'"
                                 class="menu-dropdown mt-2 flex flex-col gap-1 pl-9">
                                 <li>
-                                    <a href="http://localhost:8888/public_html/" class="menu-dropdown-item group"
+                                    <a href="https://elhoda-book.com/" class="menu-dropdown-item group"
                                         :class="page === '' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-house-door"></i> الرئيسية
                                     </a>
@@ -35,49 +35,49 @@
 
 
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/grade.php"
+                                    <a href="https://elhoda-book.com/pages/grade.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'grade' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-diagram-3"></i> المراحل الدراسية
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/teachers.php"
+                                    <a href="https://elhoda-book.com/pages/teachers.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'teachers' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-person-badge"></i> المدرسين
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/student.php"
+                                    <a href="https://elhoda-book.com/pages/student.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'student' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-people"></i> الطلاب
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/create_book.php"
+                                    <a href="https://elhoda-book.com/pages/create_book.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'create_book' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-journal-plus"></i> إنشاء كتاب
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/stock.php"
+                                    <a href="https://elhoda-book.com/pages/stock.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'stock' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-box-seam"></i> المخزون
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/expenses.php"
+                                    <a href="https://elhoda-book.com/pages/expenses.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'expenses' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-cash-stack"></i> المصروفات
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="http://localhost:8888/public_html/pages/book_reservations.php"
+                                    <a href="https://elhoda-book.com/pages/book_reservations.php"
                                         class="menu-dropdown-item group"
                                         :class="page === 'book_reservations' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
                                         <i class="bi bi-bookmark-check"></i> الحجوزات
@@ -96,7 +96,7 @@
                         Ahmed</span> &copy;
                     <span x-text="new Date().getFullYear()"></span>
                 </p>
-                <a href="http://localhost:8888/public_html/auth/logout.php" target="_blank" rel="nofollow"
+                <a href="https://elhoda-book.com/auth/logout.php" target="_blank" rel="nofollow"
                     class="bg-brand-500 text-theme-sm hover:bg-brand-600 flex items-center justify-center gap-2 rounded-lg p-3 font-medium text-white">
                     <i class="bi bi-box-arrow-right"></i> تسجيل الخروج
                 </a>

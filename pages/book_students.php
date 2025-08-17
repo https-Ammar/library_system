@@ -253,12 +253,16 @@ if (isset($_GET['book_id'])) {
                                                 </td>
                                                 <td class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                     <div class="flex items-center">
-                                                        <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-<?php
-$phone = preg_replace('/\D/', '', $student['phone'] ?? '');
-?>
-<?= !empty($phone) ? '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($student['phone']) . '</a>' : '-' ?>
-                                                        </p>
+ <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+    <?php
+    $phone = preg_replace('/\D/', '', $student['phone'] ?? '');
+    $phoneWithCode = !empty($phone) ? '20' . ltrim($phone, '0') : '';
+    ?>
+    <?= !empty($phone) 
+        ? '<a href="https://wa.me/' . $phoneWithCode . '" target="_blank">' . htmlspecialchars($student['phone']) . '</a>' 
+        : '-' ?>
+</p>
+
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-3 whitespace-nowrap first:pl-0">

@@ -26,7 +26,9 @@ $search_query = $_GET['search'] ?? '';
 $stmt = $mysqli->prepare("
     SELECT COUNT(*) AS today_orders 
     FROM BookReservations 
-    WHERE DATE(created_at) = ? AND deleted_at IS NULL
+    WHERE DATE(created_at) = ? 
+      AND deleted_at IS NULL 
+      AND LOWER(status) IN ('approved','pending')
 ");
 $stmt->bind_param('s', $selected_date);
 $stmt->execute();
@@ -37,7 +39,9 @@ $stmt->close();
 $stmt = $mysqli->prepare("
     SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue 
     FROM BookReservations 
-    WHERE DATE(created_at) = ? AND deleted_at IS NULL
+    WHERE DATE(created_at) = ? 
+      AND deleted_at IS NULL 
+      AND LOWER(status) IN ('approved','pending')
 ");
 $stmt->bind_param('s', $selected_date);
 $stmt->execute();
@@ -57,6 +61,7 @@ if (!empty($search_query)) {
     $search_types = "sss";
 }
 
+// الهستوري يعرض كل الطلبات مهما كانت الحالة
 $query = "
     SELECT 
         br.reservation_id,
@@ -78,7 +83,8 @@ $query = "
     JOIN Books b ON br.book_id = b.book_id
     LEFT JOIN Grades g ON s.grade_id = g.grade_id
     LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
-    WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
+    WHERE DATE(br.created_at) = ? 
+      AND br.deleted_at IS NULL
     $search_condition
     ORDER BY br.created_at DESC
 ";
@@ -105,9 +111,10 @@ $result = $mysqli->query("
 ");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
+// حساب الإيرادات الإجمالية فقط للطلبات الموافق عليها أو المعلقة
 $stmt = $mysqli->prepare("
     SELECT COUNT(*) AS total_books_sold, 
-           COALESCE(SUM(amount_paid), 0) AS total_revenue 
+           COALESCE(SUM(CASE WHEN LOWER(status) IN ('approved','pending') THEN amount_paid ELSE 0 END), 0) AS total_revenue 
     FROM BookReservations 
     WHERE deleted_at IS NULL
 ");
@@ -120,7 +127,7 @@ $result = $mysqli->query("
     SELECT LOWER(status) AS status, COUNT(*) AS count 
     FROM BookReservations 
     WHERE DATE(created_at) = '$selected_date' 
-    AND deleted_at IS NULL 
+      AND deleted_at IS NULL 
     GROUP BY LOWER(status)
 ");
 $order_status_counts = [
@@ -154,6 +161,7 @@ $total_users = $mysqli->query("
     WHERE deleted_at IS NULL
 ")->fetch_assoc()['total_users'] ?? 0;
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -197,8 +205,9 @@ $total_users = $mysqli->query("
         </div>
     </div>
 
-    <div x-show="isTaskModalModal" x-transition=""
-        class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999">
+    <div x-show="isTaskModalModal" x-transition="" style="
+    z-index: 999999999;
+" class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999">
         <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @click="isTaskModalModal = false">
         </div>
 
@@ -209,18 +218,16 @@ $total_users = $mysqli->query("
                 <p class="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">إدارة النشاط اليومي</p>
             </div>
 
-            <div class="custom-scrollbar overflow-y-auto px-2">
-                <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-                    <div class="sm:col-span-2">
-                        <?php foreach ($dates as $date): ?>
-                            <a href="history.php?date=<?= $date ?>" class="">
-                                <span
-                                    class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium">
-                                    <?= $date ?>
-                                </span>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
+            <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                <div class="sm:col-span-2">
+                    <?php foreach ($dates as $date): ?>
+                        <a href="history.php?date=<?= $date ?>" class="m-2">
+                            <span
+                                class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium">
+                                <?= $date ?>
+                            </span>
+                        </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -401,22 +408,27 @@ $total_users = $mysqli->query("
                                     <?= $selected_date ?>
                                 </span>
                             </p>
-                            
-                            
-                            <div class="flex items-center gap-3">
-                                    <form method="GET" action="" class="flex">
-                                        <input type="hidden" name="date" value="<?= $selected_date ?>">
-                                        <div class="relative">
-                                            <span class="absolute -translate-y-1/2 pointer-events-none top-1/2 left-4">
-                                                <svg class="fill-gray-500 dark:fill-gray-400" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.04199 9.37381C3.04199 5.87712 5.87735 3.04218 9.37533 3.04218C12.8733 3.04218 15.7087 5.87712 15.7087 9.37381C15.7087 12.8705 12.8733 15.7055 9.37533 15.7055C5.87735 15.7055 3.04199 12.8705 3.04199 9.37381ZM9.37533 1.54218C5.04926 1.54218 1.54199 5.04835 1.54199 9.37381C1.54199 13.6993 5.04926 17.2055 9.37533 17.2055C11.2676 17.2055 13.0032 16.5346 14.3572 15.4178L17.1773 18.2381C17.4702 18.531 17.945 18.5311 18.2379 18.2382C18.5308 17.9453 18.5309 17.4704 18.238 17.1775L15.4182 14.3575C16.5367 13.0035 17.2087 11.2671 17.2087 9.37381C17.2087 5.04835 13.7014 1.54218 9.37533 1.54218Z" fill=""></path>
-                                                </svg>
-                                            </span>
 
-                                            <input type="text" name="search" placeholder="بحث..." value="<?= htmlspecialchars($search_query) ?>" class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
-                                        </div>
-                                    </form>
-                                </div>
+
+                            <div class="flex items-center gap-3">
+                                <form method="GET" action="" class="flex">
+                                    <input type="hidden" name="date" value="<?= $selected_date ?>">
+                                    <div class="relative">
+                                        <span class="absolute -translate-y-1/2 pointer-events-none top-1/2 left-4">
+                                            <svg class="fill-gray-500 dark:fill-gray-400" width="20" height="20"
+                                                viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path fill-rule="evenodd" clip-rule="evenodd"
+                                                    d="M3.04199 9.37381C3.04199 5.87712 5.87735 3.04218 9.37533 3.04218C12.8733 3.04218 15.7087 5.87712 15.7087 9.37381C15.7087 12.8705 12.8733 15.7055 9.37533 15.7055C5.87735 15.7055 3.04199 12.8705 3.04199 9.37381ZM9.37533 1.54218C5.04926 1.54218 1.54199 5.04835 1.54199 9.37381C1.54199 13.6993 5.04926 17.2055 9.37533 17.2055C11.2676 17.2055 13.0032 16.5346 14.3572 15.4178L17.1773 18.2381C17.4702 18.531 17.945 18.5311 18.2379 18.2382C18.5308 17.9453 18.5309 17.4704 18.238 17.1775L15.4182 14.3575C16.5367 13.0035 17.2087 11.2671 17.2087 9.37381C17.2087 5.04835 13.7014 1.54218 9.37533 1.54218Z"
+                                                    fill=""></path>
+                                            </svg>
+                                        </span>
+
+                                        <input type="text" name="search" placeholder="بحث..."
+                                            value="<?= htmlspecialchars($search_query) ?>"
+                                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
+                                    </div>
+                                </form>
+                            </div>
                         </div>
 
                         <div class="custom-scrollbar overflow-x-auto">
@@ -491,9 +503,13 @@ $total_users = $mysqli->query("
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?php
                                                     $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+                                                    $phoneWithCode = !empty($phone) ? '20' . ltrim($phone, '0') : '';
                                                     ?>
-                                                    <?= !empty($phone) ? '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($record['student_phone']) . '</a>' : 'غير متوفر' ?>
+                                                    <?= !empty($phone)
+                                                        ? '<a href="https://wa.me/' . $phoneWithCode . '" target="_blank">' . htmlspecialchars($record['student_phone']) . '</a>'
+                                                        : 'غير متوفر' ?>
                                                 </td>
+
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?= $record['teacher_name'] ?? 'غير محدد' ?>
@@ -590,10 +606,23 @@ $total_users = $mysqli->query("
                         grid-template-columns: 1fr 1fr;
                     }
                 }
-                
+
                 .px-6.py-4.flex.items-center {
-    justify-content: space-between;
-}
+                    justify-content: space-between;
+                }
+
+                a.m-2 {
+                    margin: 10px !important;
+                }
+
+                .sm\:col-span-2 {
+                    direction: rtl;
+                    display: flex;
+                    display: flex;
+
+                    flex-wrap: wrap;
+                }
             </style>
 </body>
+
 </html>

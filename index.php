@@ -9,10 +9,18 @@ require_once './config/db.php';
 
 $today = date('Y-m-d');
 
-$result = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS today_orders 
+    FROM BookReservations 
+    WHERE DATE(created_at) = '$today' 
+      AND deleted_at IS NULL 
+      AND LOWER(status) IN ('approved','pending')");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL");
+$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue 
+    FROM BookReservations 
+    WHERE DATE(created_at) = ? 
+      AND deleted_at IS NULL 
+      AND LOWER(status) IN ('approved','pending')");
 $stmt->bind_param('s', $today);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
@@ -20,21 +28,36 @@ $stmt->fetch();
 $stmt->close();
 
 $history = [];
-$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(amount_paid) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
+$result = $mysqli->query("SELECT DATE(created_at) AS date, 
+                               COUNT(*) AS orders_count, 
+                               SUM(CASE WHEN LOWER(status) IN ('approved','pending') THEN amount_paid ELSE 0 END) AS revenue 
+                        FROM BookReservations 
+                        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
+                          AND deleted_at IS NULL 
+                        GROUP BY DATE(created_at) 
+                        ORDER BY DATE(created_at) DESC");
 while ($row = $result->fetch_assoc()) {
     $history[] = $row;
 }
 
-$result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
+$result = $mysqli->query("SELECT COUNT(*) AS total_orders 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL");
+$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, 
+                                 COALESCE(SUM(CASE WHEN LOWER(status) IN ('approved','pending') THEN amount_paid ELSE 0 END), 0) AS total_revenue 
+                          FROM BookReservations 
+                          WHERE deleted_at IS NULL");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $mysqli->query("SELECT LOWER(status) AS status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY LOWER(status)");
+$result = $mysqli->query("SELECT LOWER(status) AS status, COUNT(*) AS count 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL 
+    GROUP BY LOWER(status)");
 $order_status_counts = [
     'pending' => 0,
     'approved' => 0,
@@ -78,7 +101,8 @@ JOIN Students s ON br.student_id = s.student_id
 JOIN Books b ON br.book_id = b.book_id
 LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
 LEFT JOIN Grades g ON s.grade_id = g.grade_id
-WHERE DATE(br.created_at) = '$today' AND br.deleted_at IS NULL
+WHERE DATE(br.created_at) = '$today' 
+  AND br.deleted_at IS NULL
 ORDER BY br.created_at DESC");
 while ($row = $result->fetch_assoc()) {
     $daily_records[] = $row;
@@ -111,6 +135,7 @@ while ($row = $result->fetch_assoc()) {
     $all_records[] = $row;
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -451,17 +476,18 @@ while ($row = $result->fetch_assoc()) {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?php
-                                                $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
-                                                if (!empty($phone)) {
-                                                    echo '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($record['student_phone'] ?? 'غير متوفر') . '</a>';
-                                                } else {
-                                                    echo 'غير متوفر';
-                                                }
-                                                ?>
-                                            </td>
+                                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+    <?php
+    $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+    if (!empty($phone)) {
+        $phoneWithCode = '20' . $phone;
+        echo '<a href="https://wa.me/' . $phoneWithCode . '" target="_blank">' . htmlspecialchars($record['student_phone'] ?? 'غير متوفر') . '</a>';
+    } else {
+        echo 'غير متوفر';
+    }
+    ?>
+</td>
+
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                 <?= htmlspecialchars($record['teacher_name'] ?? 'غير محدد') ?>

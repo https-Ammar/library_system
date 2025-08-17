@@ -76,56 +76,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Sign In</title>
-    <link rel="stylesheet" href="../assets/css/main.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="description" content="تسجيل الدخول إلى موقع الحدى للحجوزات. أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى حسابك بسهولة وأمان.">
+    <title>تسجيل الدخول</title>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cairo&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="stylesheet" href="../assets/css/main.css" media="print" onload="this.media='all'">
     <style>
-        body {
-            font-family: 'Cairo', sans-serif !important;
-        }
-
-        .error-message {
-            color: #ff0000;
-            background-color: #ffebee;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            text-align: center;
-            border: 1px solid #ffcdd2;
-            animation: fadeIn 0.5s, fadeOut 0.5s 4s forwards;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes fadeOut {
-            from {
-                opacity: 1;
-            }
-
-            to {
-                opacity: 0;
-            }
-        }
-
-        * {
-            text-align: right !important;
-        }
-
-        input#checkboxLabelOne {
-            border-radius: 5px;
-        }
+body{font-family:'Cairo',sans-serif !important;}
+.error-message{color:#ff0000;background:#ffebee;padding:10px;border-radius:5px;margin-bottom:15px;text-align:center;border:1px solid #ffcdd2;}
+*{text-align:right !important;}
+input#checkboxLabelOne{border-radius:5px;}
+a{text-decoration:underline;}
+button[aria-label]{background:#ff5722;color:#fff;padding:10px;border-radius:5px;}
     </style>
 </head>
 
