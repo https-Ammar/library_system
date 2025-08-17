@@ -1,6 +1,12 @@
 <?php
 require_once '../config/db.php';
 
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 if (isset($_GET['book_id'])) {
     $book_id = intval($_GET['book_id']);
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -248,7 +254,10 @@ if (isset($_GET['book_id'])) {
                                                 <td class="px-6 py-3 whitespace-nowrap first:pl-0">
                                                     <div class="flex items-center">
                                                         <p class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                            <?= htmlspecialchars($student['phone'] ?? '-') ?>
+<?php
+$phone = preg_replace('/\D/', '', $student['phone'] ?? '');
+?>
+<?= !empty($phone) ? '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($student['phone']) . '</a>' : '-' ?>
                                                         </p>
                                                     </div>
                                                 </td>

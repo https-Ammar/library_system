@@ -1,5 +1,11 @@
 <?php
+
 session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 require_once '../config/db.php';
 
 $add_errors = [];
@@ -125,10 +131,45 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <style>
         body {
             font-family: 'Cairo', sans-serif;
         }
+        .ts-wrapper {
+            padding-top: 0 !important;
+        }
+        .ts-control {
+            height: 44px !important;
+            padding: 0.6rem 1rem !important;
+            border-radius: 0.5rem !important;
+            border: 1px solid #d1d5db !important;
+            background-color: transparent !important;
+            font-size: 0.875rem !important;
+            color: #1f2937 !important;
+        }
+        .ts-dropdown {
+            border-radius: 0.5rem !important;
+            border: 1px solid #d1d5db !important;
+            font-size: 0.875rem !important;
+        }
+        .dark .ts-control {
+            border-color: #374151 !important;
+            background-color: #111827 !important;
+            color: #e5e7eb !important;
+        }
+        .dark .ts-dropdown {
+            border-color: #374151 !important;
+            background-color: #111827 !important;
+            color: #e5e7eb !important;
+        }
+        .dark .ts-dropdown .active {
+            background-color: #1f2937 !important;
+            color: #ffffff !important;
+        }
+        input#student_select-ts-control {
+    color: var(--color-gray-700);
+}
     </style>
 </head>
 
@@ -173,15 +214,14 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                             <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
                                 <div>
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                        الطالب</label>
-                                    <select name="student_id" required
-                                        class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر الطالب</label>
+                                    <select name="student_id" id="student_select" required
+                                        placeholder="ابحث عن الطالب..."
+                                        class="w-full">
                                         <option value="">-- اختر الطالب --</option>
                                         <?php while ($student = $students->fetch_assoc()): ?>
                                             <option value="<?= $student['student_id'] ?>">
-                                                <?= htmlspecialchars($student['name']) ?> -
-                                                <?= htmlspecialchars($student['grade_name']) ?>
+                                                <?= htmlspecialchars($student['name']) ?> - <?= htmlspecialchars($student['grade_name']) ?>
                                             </option>
                                         <?php endwhile; ?>
                                     </select>
@@ -189,8 +229,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
 
                                 <div>
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                        المدرس</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر المدرس</label>
                                     <select name="teacher_id" id="teacher_id" onchange="fetchBooks()" required
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                         <option value="">-- اختر المدرس --</option>
@@ -204,8 +243,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
 
                                 <div class="sm:col-span-2">
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر
-                                        الكتاب</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">اختر الكتاب</label>
                                     <select name="book_id" id="book_id" onchange="fetchInfo()" required
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                         <option value="">-- اختر الكتاب --</option>
@@ -221,24 +259,21 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                 </div>
 
                                 <div>
-                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">سعر
-                                        الوحدة</label>
+                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">سعر الوحدة</label>
                                     <input type="number" step="0.01" name="book_price" id="book_price" readonly
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                 </div>
 
                                 <div>
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">المبلغ
-                                        الإجمالي</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">المبلغ الإجمالي</label>
                                     <input type="number" step="0.01" name="total_amount" id="total_amount" readonly
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                 </div>
 
                                 <div>
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">المبلغ
-                                        المدفوع</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">المبلغ المدفوع</label>
                                     <input type="number" step="0.01" name="amount_paid" id="amount_paid"
                                         oninput="calculateDue()" required
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
@@ -253,30 +288,25 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
 
                                 <div>
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">تاريخ
-                                        الحجز</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">تاريخ الحجز</label>
                                     <input type="date" name="reservation_date" value="<?= date('Y-m-d') ?>" required
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                 </div>
 
                                 <div class="sm:col-span-2">
                                     <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">إثبات
-                                        الدفع (صورة أو ملف)</label>
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">إثبات الدفع (صورة أو ملف)</label>
                                     <input type="file" name="receipt_image" accept="image/*,.pdf,.doc,.docx"
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">يمكنك رفع صورة إثبات الدفع
-                                        أو ملف PDF</p>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">يمكنك رفع صورة إثبات الدفع أو ملف PDF</p>
                                 </div>
                             </div>
 
                             <div class="mt-6 flex justify-end gap-3">
                                 <a href="book_reservations.php"
-                                    class="flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">العودة
-                                    للحجوزات</a>
+                                    class="flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">العودة للحجوزات</a>
                                 <button type="submit" name="add_reservation"
-                                    class="flex justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">حجز
-                                    الكتاب</button>
+                                    class="flex justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600">حجز الكتاب</button>
                             </div>
                         </form>
                     </div>
@@ -286,7 +316,26 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
     </div>
 
     <script defer src="../assets/js/bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script>
+        new TomSelect('#student_select', {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            },
+            searchField: 'text',
+            placeholder: 'ابحث عن الطالب...',
+            render: {
+                option: function(data, escape) {
+                    return '<div>' + escape(data.text) + '</div>';
+                },
+                item: function(data, escape) {
+                    return '<div>' + escape(data.text) + '</div>';
+                }
+            }
+        });
+
         function fetchBooks() {
             let teacherId = document.getElementById('teacher_id').value;
             let bookSelect = document.getElementById('book_id');

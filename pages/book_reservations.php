@@ -1,13 +1,21 @@
 <?php
 session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
+
 require_once '../config/db.php';
+
+
+
 
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
 
     $mysqli->begin_transaction();
     try {
-        // جلب بيانات الحجز بما فيها الكمية
         $getBook = $mysqli->prepare("SELECT book_id, status, quantity FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
         $getBook->bind_param("i", $id);
         $getBook->execute();
@@ -20,15 +28,13 @@ if (isset($_GET['delete'])) {
 
         $book_id = $bookData['book_id'];
         $status = $bookData['status'];
-        $quantity = $bookData['quantity']; // الكمية المحجوزة
+        $quantity = $bookData['quantity'];
 
-        // حذف الحجز (حذف ناعم)
         $stmt = $mysqli->prepare("UPDATE BookReservations SET deleted_at = NOW() WHERE reservation_id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $stmt->close();
 
-        // إعادة الكمية إلى المخزون إذا لم يكن الحجز ملغى أو معاد من قبل
         if ($status !== 'cancelled' && $status !== 'returned') {
             $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + ? WHERE book_id = ?");
             $updateQty->bind_param("ii", $quantity, $book_id);
@@ -70,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
 
     $mysqli->begin_transaction();
     try {
-        // جلب بيانات الحجز بما فيها الكمية
         $getBook = $mysqli->prepare("SELECT book_id, status, amount_paid, amount_due, receipt_image, quantity FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");
         $getBook->bind_param("i", $reservation_id);
         $getBook->execute();
@@ -86,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
         $old_amount_paid = $bookData['amount_paid'];
         $amount_due = $bookData['amount_due'];
         $old_receipt_image = $bookData['receipt_image'];
-        $quantity = $bookData['quantity']; // الكمية المحجوزة
+        $quantity = $bookData['quantity'];
 
         if ($receipt_image === null) {
             $receipt_image = $old_receipt_image;
@@ -122,12 +127,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
         $stmt->execute();
         $stmt->close();
 
-        // إدارة الكميات بناءً على تغيير الحالة
         if (
             ($status === 'cancelled' || $status === 'returned') &&
             !in_array($old_status, ['cancelled', 'returned'])
         ) {
-            // إعادة الكمية كاملة إلى المخزون
             $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + ? WHERE book_id = ?");
             $updateQty->bind_param("ii", $quantity, $book_id);
             $updateQty->execute();
@@ -136,7 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
             ($old_status === 'cancelled' || $old_status === 'returned') &&
             !in_array($status, ['cancelled', 'returned'])
         ) {
-            // خصم الكمية كاملة من المخزون
             $updateQty = $mysqli->prepare("UPDATE Books SET quantity = GREATEST(quantity - ?, 0) WHERE book_id = ?");
             $updateQty->bind_param("ii", $quantity, $book_id);
             $updateQty->execute();
@@ -158,11 +160,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
     exit;
 }
 
-// بقية الكود كما هو...
 $search = isset($_GET['search']) ? $mysqli->real_escape_string($_GET['search']) : '';
 $reservations_query = "
 SELECT br.*, 
        s.name AS student_name, 
+       s.phone AS student_phone,
        g.name AS grade_name,
        br.amount_paid, 
        br.amount_due, 
@@ -184,7 +186,8 @@ if (!empty($search)) {
         t.name LIKE '%$search%' OR 
         g.name LIKE '%$search%' OR 
         br.reservation_id = '$search' OR
-        br.order_number LIKE '%$search%'
+        br.order_number LIKE '%$search%' OR
+        s.phone LIKE '%$search%'
     )";
 }
 
@@ -209,7 +212,7 @@ ORDER BY total_reservations DESC
 ");
 
 $students = $mysqli->query("
-SELECT s.student_id, s.name, g.name AS grade_name
+SELECT s.student_id, s.name, s.phone, g.name AS grade_name
 FROM Students s
 LEFT JOIN Grades g ON s.grade_id = g.grade_id
 WHERE s.deleted_at IS NULL
@@ -441,6 +444,13 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                 <div class="flex items-center">
                                                     <p
                                                         class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
+                                                        رقم الهاتف</p>
+                                                </div>
+                                            </th>
+                                            <th class="px-6 py-3 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <p
+                                                        class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">
                                                         الكمية</p>
                                                 </div>
                                             </th>
@@ -556,6 +566,14 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                             </div>
                                                         </div>
                                                     </td>
+                                                    <td class="px-6 py-3 whitespace-nowrap">
+                                                        <p class="text-gray-700 text-theme-sm dark:text-gray-400">
+                                                            <?php
+                                                            $phone = preg_replace('/\D/', '', $row['student_phone'] ?? '');
+                                                            ?>
+                                                            <?= !empty($phone) ? '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($row['student_phone']) . '</a>' : '-' ?>
+                                                        </p>
+                                                    </td>
                                                     <td class="px-6 py-3 whitespace-nowrap text-center">
                                                         <p class="text-gray-700 text-theme-sm dark:text-gray-400">
                                                             <?= $row['quantity'] ?>
@@ -655,7 +673,7 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                                 </tr>
                                             <?php endwhile; else: ?>
                                             <tr>
-                                                <td colspan="14" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                                                <td colspan="15" class="text-center py-4 text-gray-500 dark:text-gray-400">
                                                     لا توجد بيانات للعرض
                                                 </td>
                                             </tr>

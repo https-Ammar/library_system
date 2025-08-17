@@ -1,6 +1,12 @@
 <?php
 require_once '../config/db.php';
 
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 $title = '';
 $grade_id = null;
 $teacher_id = null;

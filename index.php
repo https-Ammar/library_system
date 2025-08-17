@@ -12,7 +12,7 @@ $today = date('Y-m-d');
 $result = $mysqli->query("SELECT COUNT(*) AS today_orders FROM BookReservations WHERE DATE(created_at) = '$today' AND deleted_at IS NULL");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
+$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue FROM BookReservations WHERE DATE(created_at) = ? AND deleted_at IS NULL");
 $stmt->bind_param('s', $today);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
@@ -20,7 +20,7 @@ $stmt->fetch();
 $stmt->close();
 
 $history = [];
-$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(CASE WHEN status NOT IN ('cancelled', 'returned') THEN amount_paid ELSE 0 END) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
+$result = $mysqli->query("SELECT DATE(created_at) AS date, COUNT(*) AS orders_count, SUM(amount_paid) AS revenue FROM BookReservations WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND deleted_at IS NULL GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC");
 while ($row = $result->fetch_assoc()) {
     $history[] = $row;
 }
@@ -28,13 +28,13 @@ while ($row = $result->fetch_assoc()) {
 $result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'returned')");
+$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, COALESCE(SUM(amount_paid), 0) AS total_revenue FROM BookReservations WHERE deleted_at IS NULL");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $mysqli->query("SELECT status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY status");
+$result = $mysqli->query("SELECT LOWER(status) AS status, COUNT(*) AS count FROM BookReservations WHERE deleted_at IS NULL GROUP BY LOWER(status)");
 $order_status_counts = [
     'pending' => 0,
     'approved' => 0,
@@ -42,7 +42,10 @@ $order_status_counts = [
     'returned' => 0,
 ];
 while ($row = $result->fetch_assoc()) {
-    $order_status_counts[$row['status']] = $row['count'];
+    $status = strtolower($row['status']);
+    if (array_key_exists($status, $order_status_counts)) {
+        $order_status_counts[$status] = $row['count'];
+    }
 }
 
 $result = $mysqli->query("SELECT SUM(amount) AS total_expenses FROM Expenses WHERE deleted_at IS NULL");
@@ -143,14 +146,11 @@ while ($row = $result->fetch_assoc()) {
             <div :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
                 class="fixed z-50 h-screen w-full bg-gray-900/50"></div>
 
-
             <main>
                 <?php require('./includes/nav.php'); ?>
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
                     <div class="mb-8 flex flex-col justify-between gap-4  flex-row items-center">
-
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-white">الإحصائيات</h3>
-
                         <div>
                             <a href="./pages/history.php"
                                 class="text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
@@ -174,9 +174,6 @@ while ($row = $result->fetch_assoc()) {
 
                     <div
                         class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-
-
-
                         <div
                             class="grid rounded-2xl border border-gray-200 bg-white sm:grid-cols-2 xl:grid-cols-4 dark:border-gray-800 dark:bg-gray-900">
                             <div
@@ -374,7 +371,6 @@ while ($row = $result->fetch_assoc()) {
                         </article>
                     </div>
 
-
                     <div
                         class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                         <div class="px-6 py-4">
@@ -457,7 +453,14 @@ while ($row = $result->fetch_assoc()) {
                                             </td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= htmlspecialchars($record['student_phone'] ?? 'غير متوفر') ?>
+                                                <?php
+                                                $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+                                                if (!empty($phone)) {
+                                                    echo '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($record['student_phone'] ?? 'غير متوفر') . '</a>';
+                                                } else {
+                                                    echo 'غير متوفر';
+                                                }
+                                                ?>
                                             </td>
                                             <td
                                                 class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
@@ -519,13 +522,8 @@ while ($row = $result->fetch_assoc()) {
                             </table>
                         </div>
                     </div>
-
                 </div>
-
             </main>
-
-
-
 
             <script defer src="./assets/js/bundle.js"></script>
         </div>
@@ -542,9 +540,6 @@ while ($row = $result->fetch_assoc()) {
 
         * {
             text-align: right !important;
-
-
-
         }
 
         td.px-6.py-4.text-left.text-sm.whitespace-nowrap.text-gray-700.dark\:text-gray-400 {
@@ -552,13 +547,10 @@ while ($row = $result->fetch_assoc()) {
         }
 
         @media screen and (max-width:992px) {
-
-
             .grid.rounded-2xl.border.border-gray-200.bg-white.sm\:grid-cols-2.xl\:grid-cols-4.dark\:border-gray-800.dark\:bg-gray-900 {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
             }
-
         }
     </style>
 </body>

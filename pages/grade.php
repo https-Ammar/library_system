@@ -7,6 +7,13 @@ $errors = [];
 $edit_id = null;
 $isTaskModalModal = false;
 
+
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
     $stmt = $mysqli->prepare("UPDATE Grades SET deleted_at = NOW() WHERE grade_id = ?");

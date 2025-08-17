@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ./auth/signin.php");
+    header("Location: ../auth/signin.php");
     exit();
 }
 
@@ -21,6 +21,7 @@ while ($row = $dates_result->fetch_assoc()) {
 }
 
 $selected_date = $_GET['date'] ?? $today;
+$search_query = $_GET['search'] ?? '';
 
 $stmt = $mysqli->prepare("
     SELECT COUNT(*) AS today_orders 
@@ -36,8 +37,7 @@ $stmt->close();
 $stmt = $mysqli->prepare("
     SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue 
     FROM BookReservations 
-    WHERE DATE(created_at) = ? AND deleted_at IS NULL 
-    AND status NOT IN ('cancelled', 'returned')
+    WHERE DATE(created_at) = ? AND deleted_at IS NULL
 ");
 $stmt->bind_param('s', $selected_date);
 $stmt->execute();
@@ -46,7 +46,18 @@ $stmt->fetch();
 $stmt->close();
 
 $all_records = [];
-$stmt = $mysqli->prepare("
+$search_condition = "";
+$search_params = [];
+$search_types = "";
+
+if (!empty($search_query)) {
+    $search_condition = " AND (br.order_number LIKE ? OR s.name LIKE ? OR s.phone LIKE ?)";
+    $search_param = "%$search_query%";
+    $search_params = [$search_param, $search_param, $search_param];
+    $search_types = "sss";
+}
+
+$query = "
     SELECT 
         br.reservation_id,
         br.order_number,
@@ -68,9 +79,18 @@ $stmt = $mysqli->prepare("
     LEFT JOIN Grades g ON s.grade_id = g.grade_id
     LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
     WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
+    $search_condition
     ORDER BY br.created_at DESC
-");
-$stmt->bind_param('s', $selected_date);
+";
+
+$stmt = $mysqli->prepare($query);
+
+if (!empty($search_query)) {
+    $stmt->bind_param('s' . $search_types, $selected_date, ...$search_params);
+} else {
+    $stmt->bind_param('s', $selected_date);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
@@ -89,8 +109,7 @@ $stmt = $mysqli->prepare("
     SELECT COUNT(*) AS total_books_sold, 
            COALESCE(SUM(amount_paid), 0) AS total_revenue 
     FROM BookReservations 
-    WHERE deleted_at IS NULL 
-    AND status NOT IN ('cancelled', 'returned')
+    WHERE deleted_at IS NULL
 ");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
@@ -98,11 +117,11 @@ $stmt->fetch();
 $stmt->close();
 
 $result = $mysqli->query("
-    SELECT status, COUNT(*) AS count 
+    SELECT LOWER(status) AS status, COUNT(*) AS count 
     FROM BookReservations 
     WHERE DATE(created_at) = '$selected_date' 
     AND deleted_at IS NULL 
-    GROUP BY status
+    GROUP BY LOWER(status)
 ");
 $order_status_counts = [
     'pending' => 0,
@@ -111,7 +130,10 @@ $order_status_counts = [
     'returned' => 0,
 ];
 while ($row = $result->fetch_assoc()) {
-    $order_status_counts[$row['status']] = $row['count'];
+    $status = strtolower($row['status']);
+    if (array_key_exists($status, $order_status_counts)) {
+        $order_status_counts[$status] = $row['count'];
+    }
 }
 
 $total_expenses = $mysqli->query("
@@ -177,15 +199,11 @@ $total_users = $mysqli->query("
 
     <div x-show="isTaskModalModal" x-transition=""
         class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999">
-
-
-
         <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @click="isTaskModalModal = false">
         </div>
 
         <div @click.outside="isTaskModalModal = false"
             class="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
-
             <div class="px-2">
                 <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">سجل النشاط </h4>
                 <p class="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">إدارة النشاط اليومي</p>
@@ -194,7 +212,6 @@ $total_users = $mysqli->query("
             <div class="custom-scrollbar overflow-y-auto px-2">
                 <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
                     <div class="sm:col-span-2">
-
                         <?php foreach ($dates as $date): ?>
                             <a href="history.php?date=<?= $date ?>" class="">
                                 <span
@@ -203,8 +220,6 @@ $total_users = $mysqli->query("
                                 </span>
                             </a>
                         <?php endforeach; ?>
-
-
                     </div>
                 </div>
             </div>
@@ -226,12 +241,8 @@ $total_users = $mysqli->query("
             <main>
                 <?php require('../includes/nav.php'); ?>
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
-
-
                     <div class="mb-8 flex flex-col justify-between gap-4  flex-row items-center">
-
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-white"> السجل الكامل</h3>
-
                         <div>
                             <button @click="isTaskModalModal = true"
                                 class="text-theme-sm shadow-theme-xs inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
@@ -253,11 +264,8 @@ $total_users = $mysqli->query("
                         </div>
                     </div>
 
-
-
                     <div
                         class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-
                         <div
                             class="grid rounded-2xl border border-gray-200 bg-white sm:grid-cols-2 xl:grid-cols-4 dark:border-gray-800 dark:bg-gray-900">
                             <div
@@ -385,15 +393,30 @@ $total_users = $mysqli->query("
                         </div>
                     </div>
                     <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                        <div class="px-6 py-4">
+                        <div class="px-6 py-4 flex items-center ">
                             <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400 justify-between">
                                 السجل اليومي
-
                                 <span
                                     class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium">
                                     <?= $selected_date ?>
                                 </span>
                             </p>
+                            
+                            
+                            <div class="flex items-center gap-3">
+                                    <form method="GET" action="" class="flex">
+                                        <input type="hidden" name="date" value="<?= $selected_date ?>">
+                                        <div class="relative">
+                                            <span class="absolute -translate-y-1/2 pointer-events-none top-1/2 left-4">
+                                                <svg class="fill-gray-500 dark:fill-gray-400" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.04199 9.37381C3.04199 5.87712 5.87735 3.04218 9.37533 3.04218C12.8733 3.04218 15.7087 5.87712 15.7087 9.37381C15.7087 12.8705 12.8733 15.7055 9.37533 15.7055C5.87735 15.7055 3.04199 12.8705 3.04199 9.37381ZM9.37533 1.54218C5.04926 1.54218 1.54199 5.04835 1.54199 9.37381C1.54199 13.6993 5.04926 17.2055 9.37533 17.2055C11.2676 17.2055 13.0032 16.5346 14.3572 15.4178L17.1773 18.2381C17.4702 18.531 17.945 18.5311 18.2379 18.2382C18.5308 17.9453 18.5309 17.4704 18.238 17.1775L15.4182 14.3575C16.5367 13.0035 17.2087 11.2671 17.2087 9.37381C17.2087 5.04835 13.7014 1.54218 9.37533 1.54218Z" fill=""></path>
+                                                </svg>
+                                            </span>
+
+                                            <input type="text" name="search" placeholder="بحث..." value="<?= htmlspecialchars($search_query) ?>" class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
+                                        </div>
+                                    </form>
+                                </div>
                         </div>
 
                         <div class="custom-scrollbar overflow-x-auto">
@@ -466,7 +489,10 @@ $total_users = $mysqli->query("
                                                 </td>
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                    <?= $record['student_phone'] ?? 'غير متوفر' ?>
+                                                    <?php
+                                                    $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+                                                    ?>
+                                                    <?= !empty($phone) ? '<a href="https://wa.me/' . $phone . '" target="_blank">' . htmlspecialchars($record['student_phone']) . '</a>' : 'غير متوفر' ?>
                                                 </td>
                                                 <td
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
@@ -504,7 +530,6 @@ $total_users = $mysqli->query("
                                                     class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
                                                     <?= date('h:i A', strtotime($record['created_at'])) ?>
                                                 </td>
-
                                                 <td class="px-6 py-4 text-left">
                                                     <?php
                                                     $status = $record['status'];
@@ -560,14 +585,15 @@ $total_users = $mysqli->query("
                 }
 
                 @media screen and (max-width:992px) {
-
-
                     .grid.rounded-2xl.border.border-gray-200.bg-white.sm\:grid-cols-2.xl\:grid-cols-4.dark\:border-gray-800.dark\:bg-gray-900 {
                         display: grid;
                         grid-template-columns: 1fr 1fr;
                     }
                 }
+                
+                .px-6.py-4.flex.items-center {
+    justify-content: space-between;
+}
             </style>
 </body>
-
 </html>

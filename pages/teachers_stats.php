@@ -5,6 +5,14 @@ require_once '../config/db.php';
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
 
+
+
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
     $mysqli->begin_transaction();
     try {
         $getBook = $mysqli->prepare("SELECT book_id, status FROM BookReservations WHERE reservation_id = ? AND deleted_at IS NULL");

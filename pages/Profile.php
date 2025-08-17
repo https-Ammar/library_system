@@ -1,9 +1,18 @@
 <?php
 require_once '../config/db.php';
 
+
+
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 if (!isset($_GET['id'])) {
     die("معرف المدرس غير موجود");
 }
+
 
 $teacher_id = intval($_GET['id']);
 
@@ -159,7 +168,16 @@ $stats_stmt->close();
                                     <?php if (!empty($teacher['image_url'])): ?>
                                         <img src="<?= htmlspecialchars($teacher['image_url']) ?>" alt="user">
                                     <?php else: ?>
-                                        <span class="text-muted">لا توجد صورة</span>
+                                   
+                                   <div class="flex items-center justify-center w-10 h-10 rounded-full bg-brand-100">
+                                                                                                                                    <span class="text-xs font-semibold text-brand-500">
+                                                                     <?= !empty($teacher['name']) ? mb_substr($teacher['name'], 0, 1) : '-' ?>                                                                  </span>
+                                                                                                                            </div>
+                                   
+                                                             
+                                                                                
+
+                                   
                                     <?php endif; ?>
                                 </div>
                                 <div class="order-3 xl:order-2">
@@ -439,7 +457,14 @@ $stats_stmt->close();
                                                                                 alt="صورة الكتاب">
                                                                         </div>
                                                                     <?php else: ?>
-                                                                        <span class="text-muted">لا توجد صورة</span>
+                                                                   
+                                                           
+                                                           
+                                                           <div class="flex items-center justify-center w-10 h-10 rounded-full bg-brand-100">
+                                                                                                                                    <span class="text-xs font-semibold text-brand-500">
+                                                                     <?= htmlspecialchars(mb_substr($book['title'] ?? '—', 0, 1)) ?>                                                                    </span>
+                                                                                                                            </div>
+                                                              
                                                                     <?php endif; ?>
                                                                 </div>
                                                             </div>
@@ -642,6 +667,21 @@ $stats_stmt->close();
                             evt.currentTarget.className += " active";
                         }
                     </script>
+
+
+<style>
+    
+    .h-20.w-20.overflow-hidden.rounded-full.border.border-gray-200.dark\:border-gray-800 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #dde9ff;
+}
+
+.px-6.py-4.flex.items-center {
+    justify-content: space-between;
+}
+</style>
 
                 </div>
             </main>

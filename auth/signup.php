@@ -73,13 +73,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $mail->isSMTP();
                     $mail->Host = 'smtp.gmail.com';
                     $mail->SMTPAuth = true;
-                    $mail->Username = 'ammar132004@gmail.com';
-                    $mail->Password = 'liucpvijkorozodu';
+                    $mail->Username = 'hamo11adel22@gmail.com';
+                    $mail->Password = 'jmqwvczedfiamktm';
                     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                     $mail->Port = 587;
                     $mail->CharSet = 'UTF-8';
 
-                    $mail->setFrom('ammar132004@gmail.com', 'موقعك');
+                    $mail->setFrom('hamo11adel22@gmail.com', 'موقعك');
                     $mail->addAddress($email);
 
                     $mail->isHTML(true);
@@ -329,7 +329,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
         </div>
     </div>
-    <script data-cfasync="false" src="../assets/js/email-decode.min.js"></script>
     <script defer src="../assets/js/bundle.js"></script>
     <style>
         * {

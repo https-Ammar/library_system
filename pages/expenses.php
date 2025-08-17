@@ -1,6 +1,12 @@
 <?php
 require_once '../config/db.php';
 
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../auth/signin.php");
+    exit();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_expense'])) {
     $description = trim($_POST['description']);
     $amount = floatval($_POST['amount']);
