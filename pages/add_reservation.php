@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../auth/signin.php");
@@ -14,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reservation'])) {
     $teacher_id = intval($_POST['teacher_id']);
     $book_id = intval($_POST['book_id']);
     $quantity = intval($_POST['quantity']);
-    $reservation_date = $_POST['reservation_date'] ?: date('Y-m-d');
+    $reservation_date = $_POST['reservation_date'] ?: date('Y-m-d H:i:s');
     $amount_paid = floatval($_POST['amount_paid']);
     $book_price = floatval($_POST['book_price']);
     $receipt_image = null;
@@ -24,28 +23,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reservation'])) {
         if (!file_exists($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
-
         $fileExt = pathinfo($_FILES['receipt_image']['name'], PATHINFO_EXTENSION);
         $fileName = 'receipt_' . uniqid() . '.' . $fileExt;
         $targetPath = $uploadDir . $fileName;
-
         if (move_uploaded_file($_FILES['receipt_image']['tmp_name'], $targetPath)) {
             $receipt_image = $targetPath;
         }
     }
 
-    if ($student_id <= 0)
-        $add_errors[] = "اختر الطالب.";
-    if ($teacher_id <= 0)
-        $add_errors[] = "اختر المدرس.";
-    if ($book_id <= 0)
-        $add_errors[] = "اختر الكتاب.";
-    if ($quantity <= 0)
-        $add_errors[] = "الكمية يجب أن تكون أكبر من الصفر.";
-    if ($amount_paid < 0)
-        $add_errors[] = "المبلغ المدفوع غير صحيح.";
-    if ($book_price < 0)
-        $add_errors[] = "سعر الكتاب غير صحيح.";
+    if ($student_id <= 0) $add_errors[] = "اختر الطالب.";
+    if ($teacher_id <= 0) $add_errors[] = "اختر المدرس.";
+    if ($book_id <= 0) $add_errors[] = "اختر الكتاب.";
+    if ($quantity <= 0) $add_errors[] = "الكمية يجب أن تكون أكبر من الصفر.";
+    if ($amount_paid < 0) $add_errors[] = "المبلغ المدفوع غير صحيح.";
+    if ($book_price < 0) $add_errors[] = "سعر الكتاب غير صحيح.";
 
     if (empty($add_errors)) {
         $mysqli->begin_transaction();
@@ -88,7 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_reservation'])) {
                 ) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
             ");
-            $stmt->bind_param("iiiiddsddss", $student_id, $teacher_id, $book_id, $quantity, $book['price'], $total_price, $reservation_date, $amount_paid, $amount_due, $order_number, $receipt_image);
+            $stmt->bind_param(
+                "iiiiddsddss", 
+                $student_id, 
+                $teacher_id, 
+                $book_id, 
+                $quantity, 
+                $book['price'], 
+                $total_price, 
+                $reservation_date, 
+                $amount_paid, 
+                $amount_due, 
+                $order_number, 
+                $receipt_image
+            );
             $stmt->execute();
             $stmt->close();
 
@@ -121,6 +125,7 @@ ORDER BY s.name
 
 $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_at IS NULL ORDER BY name");
 ?>
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
@@ -286,12 +291,14 @@ $teachers = $mysqli->query("SELECT teacher_id, name FROM Teachers WHERE deleted_
                                         class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                                 </div>
 
-                                <div>
-                                    <label
-                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">تاريخ الحجز</label>
-                                    <input type="date" name="reservation_date" value="<?= date('Y-m-d') ?>" required
-                                        class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                </div>
+                       <div>
+    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">تاريخ الحجز</label>
+    <input type="date" name="reservation_date" 
+        value="<?= (new DateTime('now', new DateTimeZone('Africa/Cairo')))->format('Y-m-d') ?>" 
+        required
+        class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+</div>
+
 
                                 <div class="sm:col-span-2">
                                     <label

@@ -17,9 +17,7 @@ if (isset($_GET['delete'])) {
         $bookData = $getBook->get_result()->fetch_assoc();
         $getBook->close();
 
-        if (!$bookData) {
-            throw new Exception("الحجز غير موجود أو محذوف مسبقًا");
-        }
+        if (!$bookData) throw new Exception("الحجز غير موجود أو محذوف مسبقًا");
 
         $book_id = $bookData['book_id'];
         $status = $bookData['status'];
@@ -57,17 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
 
     if (isset($_FILES['receipt_image']) && $_FILES['receipt_image']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = '../Uploads/receipts/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
-
+        if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
         $fileExt = pathinfo($_FILES['receipt_image']['name'], PATHINFO_EXTENSION);
         $fileName = 'receipt_' . uniqid() . '.' . $fileExt;
         $targetPath = $uploadDir . $fileName;
-
-        if (move_uploaded_file($_FILES['receipt_image']['tmp_name'], $targetPath)) {
-            $receipt_image = $targetPath;
-        }
+        if (move_uploaded_file($_FILES['receipt_image']['tmp_name'], $targetPath)) $receipt_image = $targetPath;
     }
 
     $mysqli->begin_transaction();
@@ -78,9 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
         $bookData = $getBook->get_result()->fetch_assoc();
         $getBook->close();
 
-        if (!$bookData) {
-            throw new Exception("الحجز غير موجود أو محذوف مسبقًا");
-        }
+        if (!$bookData) throw new Exception("الحجز غير موجود أو محذوف مسبقًا");
 
         $book_id = $bookData['book_id'];
         $old_status = $bookData['status'];
@@ -89,12 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
         $old_receipt_image = $bookData['receipt_image'];
         $quantity = $bookData['quantity'];
 
-        if ($receipt_image === null) {
-            $receipt_image = $old_receipt_image;
-        }
+        if ($receipt_image === null) $receipt_image = $old_receipt_image;
 
         if ($amount_paid !== null) {
-            $amount_due = max($amount_due - ($amount_paid - $old_amount_paid), 0);
+            $difference = $amount_paid - $old_amount_paid;
+            $amount_due = max($amount_due - $difference, 0);
             $stmt = $mysqli->prepare("
                 UPDATE BookReservations 
                 SET status = ?, 
@@ -107,6 +96,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
                 WHERE reservation_id = ?
             ");
             $stmt->bind_param("sddssssi", $status, $amount_paid, $amount_due, $receipt_image, $status, $status, $status, $reservation_id);
+            $stmt->execute();
+            $stmt->close();
+
+            $today = date('Y-m-d');
+            $dailyCheck = $mysqli->prepare("SELECT amount FROM DailyRevenue WHERE date = ?");
+            $dailyCheck->bind_param("s", $today);
+            $dailyCheck->execute();
+            $result = $dailyCheck->get_result();
+            if ($result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                $newAmount = $row['amount'] + $difference;
+                $updateDaily = $mysqli->prepare("UPDATE DailyRevenue SET amount = ? WHERE date = ?");
+                $updateDaily->bind_param("ds", $newAmount, $today);
+                $updateDaily->execute();
+                $updateDaily->close();
+            } else {
+                $insertDaily = $mysqli->prepare("INSERT INTO DailyRevenue (date, amount) VALUES (?, ?)");
+                $insertDaily->bind_param("sd", $today, $difference);
+                $insertDaily->execute();
+                $insertDaily->close();
+            }
+            $dailyCheck->close();
         } else {
             $stmt = $mysqli->prepare("
                 UPDATE BookReservations 
@@ -118,10 +129,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
                 WHERE reservation_id = ?
             ");
             $stmt->bind_param("sssssi", $status, $receipt_image, $status, $status, $status, $reservation_id);
+            $stmt->execute();
+            $stmt->close();
         }
-
-        $stmt->execute();
-        $stmt->close();
 
         if (($status === 'cancelled' || $status === 'returned') && !in_array($old_status, ['cancelled', 'returned'])) {
             $updateQty = $mysqli->prepare("UPDATE Books SET quantity = quantity + ? WHERE book_id = ?");
@@ -140,12 +150,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_reservation_id']
             $updateQty->close();
         }
 
-        if ($receipt_image !== $old_receipt_image && $old_receipt_image && file_exists($old_receipt_image)) {
-            unlink($old_receipt_image);
-        }
+        if ($receipt_image !== $old_receipt_image && $old_receipt_image && file_exists($old_receipt_image)) unlink($old_receipt_image);
 
         $mysqli->commit();
-        $_SESSION['message'] = " ";
+        $_SESSION['message'] = "تم تحديث الحجز وإضافة الدفع في السجل اليومي بنجاح";
     } catch (Exception $e) {
         $mysqli->rollback();
         $_SESSION['error'] = "فشل في تحديث الحجز: " . $e->getMessage();

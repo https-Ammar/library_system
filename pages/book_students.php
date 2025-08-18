@@ -7,6 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+date_default_timezone_set('Africa/Cairo');
+
 if (isset($_GET['book_id'])) {
     $book_id = intval($_GET['book_id']);
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -17,44 +19,72 @@ if (isset($_GET['book_id'])) {
     $stmt->execute();
     $book_result = $stmt->get_result();
     $book = $book_result->fetch_assoc();
+    $stmt->close();
 
-    $reservations_query = "SELECT SUM(quantity) AS total_reserved FROM BookReservations WHERE book_id = ? AND status = 'approved' AND deleted_at IS NULL";
-    $stmt = $mysqli->prepare($reservations_query);
-    $stmt->bind_param("i", $book_id);
-    $stmt->execute();
-    $reservations_result = $stmt->get_result();
-    $reserved = $reservations_result->fetch_assoc();
-    $available_quantity = $book['quantity'] - ($reserved['total_reserved'] ?? 0);
-
-    $students_query = "
-        SELECT 
-            br.reservation_id, br.order_number, br.quantity as reserved_quantity,
-            s.student_id, s.name, s.phone, s.email, s.address,
-            g.name AS grade_name,
-            br.reservation_date, br.status, br.amount_paid, br.amount_due
-        FROM BookReservations br
-        JOIN Students s ON br.student_id = s.student_id
-        LEFT JOIN Grades g ON s.grade_id = g.grade_id
-        WHERE br.book_id = ? AND br.deleted_at IS NULL
-    ";
-
-    if ($search !== '') {
-        $students_query .= " AND (s.name LIKE ? OR g.name LIKE ? OR s.phone LIKE ? OR br.order_number LIKE ?)";
-    }
-
-    $students_query .= " ORDER BY br.reservation_date DESC";
-
-    $stmt = $mysqli->prepare($students_query);
-
-    if ($search !== '') {
-        $like = "%{$search}%";
-        $stmt->bind_param("issss", $book_id, $like, $like, $like, $like);
-    } else {
+    if ($book) {
+        // عدد المحجوز فعليًا
+        $reservations_query = "
+            SELECT SUM(quantity) AS total_reserved 
+            FROM BookReservations 
+            WHERE book_id = ? 
+              AND status = 'approved' 
+              AND deleted_at IS NULL
+        ";
+        $stmt = $mysqli->prepare($reservations_query);
         $stmt->bind_param("i", $book_id);
-    }
+        $stmt->execute();
+        $reservations_result = $stmt->get_result();
+        $reserved = $reservations_result->fetch_assoc();
+        $stmt->close();
 
-    $stmt->execute();
-    $students_result = $stmt->get_result();
+        $available_quantity = $book['quantity'] - ($reserved['total_reserved'] ?? 0);
+
+        // الطلبات الخاصة بالكتاب
+        $students_query = "
+            SELECT 
+                br.reservation_id, 
+                br.order_number, 
+                br.quantity AS reserved_quantity,
+                s.student_id, 
+                s.name, 
+                s.phone, 
+                s.email, 
+                s.address,
+                g.name AS grade_name,
+                br.reservation_date, 
+                br.status, 
+                br.amount_paid, 
+                br.amount_due
+            FROM BookReservations br
+            JOIN Students s ON br.student_id = s.student_id
+            LEFT JOIN Grades g ON s.grade_id = g.grade_id
+            WHERE br.book_id = ? 
+              AND br.deleted_at IS NULL
+        ";
+
+        if ($search !== '') {
+            $students_query .= " AND (s.name LIKE ? OR g.name LIKE ? OR s.phone LIKE ? OR br.order_number LIKE ?)";
+        }
+
+        $students_query .= " ORDER BY br.reservation_date DESC";
+
+        $stmt = $mysqli->prepare($students_query);
+
+        if ($search !== '') {
+            $like = "%{$search}%";
+            $stmt->bind_param("issss", $book_id, $like, $like, $like, $like);
+        } else {
+            $stmt->bind_param("i", $book_id);
+        }
+
+        $stmt->execute();
+        $students_result = $stmt->get_result();
+        $stmt->close();
+    } else {
+        $book = null;
+        $available_quantity = 0;
+        $students_result = null;
+    }
 }
 ?>
 

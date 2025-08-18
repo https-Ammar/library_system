@@ -6,135 +6,162 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once './config/db.php';
-
+date_default_timezone_set('Africa/Cairo');
 $today = date('Y-m-d');
 
-$result = $mysqli->query("SELECT COUNT(*) AS today_orders 
+// إنشاء جدول حركات الدفع إذا لم يكن موجوداً
+$mysqli->query("
+    CREATE TABLE IF NOT EXISTS PaymentTransactions (
+        transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+        reservation_id INT NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        payment_date DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (reservation_id) REFERENCES BookReservations(reservation_id)
+    )
+");
+
+// عدد الطلبات اليوم
+$result = $mysqli->query("
+    SELECT COUNT(*) AS today_orders 
     FROM BookReservations 
     WHERE DATE(created_at) = '$today' 
       AND deleted_at IS NULL 
-      AND LOWER(status) IN ('approved','pending')");
+      AND status IN ('approved','pending')
+");
 $today_orders = $result->fetch_assoc()['today_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COALESCE(SUM(amount_paid), 0) AS today_revenue 
-    FROM BookReservations 
-    WHERE DATE(created_at) = ? 
-      AND deleted_at IS NULL 
-      AND LOWER(status) IN ('approved','pending')");
-$stmt->bind_param('s', $today);
+// الإيرادات النهارية (المجموع بين المدفوع ودفعات اليوم)
+$stmt = $mysqli->prepare("
+    SELECT 
+        COALESCE(SUM(br.amount_paid),0) + COALESCE(SUM(pt.amount),0) AS today_revenue
+    FROM BookReservations br
+    LEFT JOIN PaymentTransactions pt 
+        ON br.reservation_id = pt.reservation_id AND DATE(pt.payment_date) = ?
+    WHERE DATE(br.created_at) = ? AND br.deleted_at IS NULL
+");
+$stmt->bind_param('ss', $today, $today);
 $stmt->execute();
 $stmt->bind_result($today_revenue);
 $stmt->fetch();
 $stmt->close();
 
+// تاريخ آخر 30 يومًا
 $history = [];
-$result = $mysqli->query("SELECT DATE(created_at) AS date, 
-                               COUNT(*) AS orders_count, 
-                               SUM(CASE WHEN LOWER(status) IN ('approved','pending') THEN amount_paid ELSE 0 END) AS revenue 
-                        FROM BookReservations 
-                        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
-                          AND deleted_at IS NULL 
-                        GROUP BY DATE(created_at) 
-                        ORDER BY DATE(created_at) DESC");
-while ($row = $result->fetch_assoc()) {
-    $history[] = $row;
-}
-
-$result = $mysqli->query("SELECT COUNT(*) AS total_orders 
+$result = $mysqli->query("
+    SELECT DATE(created_at) AS date, 
+           COUNT(*) AS orders_count, 
+           SUM(CASE WHEN status IN ('approved','pending') THEN amount_paid ELSE 0 END) AS revenue 
     FROM BookReservations 
-    WHERE deleted_at IS NULL");
+    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
+      AND deleted_at IS NULL 
+    GROUP BY DATE(created_at) 
+    ORDER BY DATE(created_at) DESC
+");
+while ($row = $result->fetch_assoc()) $history[] = $row;
+
+// إجمالي الطلبات
+$result = $mysqli->query("SELECT COUNT(*) AS total_orders FROM BookReservations WHERE deleted_at IS NULL");
 $total_orders = $result->fetch_assoc()['total_orders'] ?? 0;
 
-$stmt = $mysqli->prepare("SELECT COUNT(*) AS total_books_sold, 
-                                 COALESCE(SUM(CASE WHEN LOWER(status) IN ('approved','pending') THEN amount_paid ELSE 0 END), 0) AS total_revenue 
-                          FROM BookReservations 
-                          WHERE deleted_at IS NULL");
+// إجمالي الكتب المباعة والإيرادات الكلية
+$stmt = $mysqli->prepare("
+    SELECT COUNT(*) AS total_books_sold, 
+           COALESCE(SUM(CASE WHEN status IN ('approved','pending') THEN amount_paid ELSE 0 END),0) AS total_revenue 
+    FROM BookReservations 
+    WHERE deleted_at IS NULL
+");
 $stmt->execute();
 $stmt->bind_result($total_books_sold, $total_revenue);
 $stmt->fetch();
 $stmt->close();
 
-$result = $mysqli->query("SELECT LOWER(status) AS status, COUNT(*) AS count 
+// عداد حالة الطلبات
+$result = $mysqli->query("
+    SELECT status, COUNT(*) AS count 
     FROM BookReservations 
     WHERE deleted_at IS NULL 
-    GROUP BY LOWER(status)");
-$order_status_counts = [
-    'pending' => 0,
-    'approved' => 0,
-    'cancelled' => 0,
-    'returned' => 0,
-];
+    GROUP BY status
+");
+$order_status_counts = ['pending' => 0, 'approved' => 0, 'cancelled' => 0, 'returned' => 0];
 while ($row = $result->fetch_assoc()) {
-    $status = strtolower($row['status']);
-    if (array_key_exists($status, $order_status_counts)) {
-        $order_status_counts[$status] = $row['count'];
-    }
+    $status = $row['status'];
+    if (array_key_exists($status, $order_status_counts)) $order_status_counts[$status] = $row['count'];
 }
 
+// إجمالي المصروفات
 $result = $mysqli->query("SELECT SUM(amount) AS total_expenses FROM Expenses WHERE deleted_at IS NULL");
 $total_expenses = $result->fetch_assoc()['total_expenses'] ?? 0;
 
+// إجمالي الطلاب
 $result = $mysqli->query("SELECT COUNT(*) AS total_students FROM Students WHERE deleted_at IS NULL");
 $total_students = $result->fetch_assoc()['total_students'] ?? 0;
 
+// إجمالي المستخدمين
 $result = $mysqli->query("SELECT COUNT(*) AS total_users FROM Users WHERE deleted_at IS NULL");
 $total_users = $result->fetch_assoc()['total_users'] ?? 0;
 
+// سجلات اليوم (المدفوعات والتحديثات)
 $daily_records = [];
-$result = $mysqli->query("SELECT 
-    br.reservation_id,
-    br.order_number,
-    s.name AS student_name,
-    s.phone AS student_phone,
-    g.name AS grade_name,
-    t.name AS teacher_name,
-    t.phone AS teacher_phone,
-    b.title AS book_title,
-    b.price AS book_price,
-    br.quantity,
-    br.amount_paid,
-    br.amount_due,
-    br.status,
-    br.created_at
-FROM BookReservations br
-JOIN Students s ON br.student_id = s.student_id
-JOIN Books b ON br.book_id = b.book_id
-LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
-LEFT JOIN Grades g ON s.grade_id = g.grade_id
-WHERE DATE(br.created_at) = '$today' 
-  AND br.deleted_at IS NULL
-ORDER BY br.created_at DESC");
-while ($row = $result->fetch_assoc()) {
-    $daily_records[] = $row;
-}
+$result = $mysqli->query("
+    SELECT 
+        br.reservation_id,
+        br.order_number,
+        s.name AS student_name,
+        s.phone AS student_phone,
+        g.name AS grade_name,
+        t.name AS teacher_name,
+        t.phone AS teacher_phone,
+        b.title AS book_title,
+        b.price AS book_price,
+        br.quantity,
+        br.amount_paid,
+        br.amount_due,
+        br.status,
+        br.created_at,
+        br.updated_at
+    FROM BookReservations br
+    JOIN Students s ON br.student_id = s.student_id
+    JOIN Books b ON br.book_id = b.book_id
+    LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+    LEFT JOIN Grades g ON s.grade_id = g.grade_id
+    WHERE (DATE(br.created_at) = '$today' OR (DATE(br.updated_at) = '$today' AND br.updated_at != br.created_at))
+      AND br.deleted_at IS NULL
+    ORDER BY br.updated_at DESC, br.created_at DESC
+");
+while ($row = $result->fetch_assoc()) $daily_records[] = $row;
 
-$all_records = [];
-$result = $mysqli->query("SELECT 
-    br.reservation_id,
-    br.order_number,
-    s.name AS student_name,
-    s.phone AS student_phone,
-    g.name AS grade_name,
-    t.name AS teacher_name,
-    t.phone AS teacher_phone,
-    b.title AS book_title,
-    b.price AS book_price,
-    br.quantity,
-    br.amount_paid,
-    br.amount_due,
-    br.status,
-    br.created_at
-FROM BookReservations br
-JOIN Students s ON br.student_id = s.student_id
-JOIN Books b ON br.book_id = b.book_id
-LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
-LEFT JOIN Grades g ON s.grade_id = g.grade_id
-WHERE br.deleted_at IS NULL
-ORDER BY br.created_at DESC");
-while ($row = $result->fetch_assoc()) {
-    $all_records[] = $row;
-}
+// تحديثات الدفع اليوم
+$payment_updates = [];
+$result = $mysqli->query("
+    SELECT 
+        br.reservation_id,
+        br.order_number,
+        s.name AS student_name,
+        s.phone AS student_phone,
+        g.name AS grade_name,
+        t.name AS teacher_name,
+        b.title AS book_title,
+        b.price AS book_price,
+        br.quantity,
+        pt.amount,
+        pt.payment_date,
+        (b.price * br.quantity) AS total_amount,
+        (SELECT COALESCE(SUM(amount),0) FROM PaymentTransactions WHERE reservation_id = br.reservation_id) AS total_paid,
+        (b.price * br.quantity - (SELECT COALESCE(SUM(amount),0) FROM PaymentTransactions WHERE reservation_id = br.reservation_id)) AS remaining_amount
+    FROM PaymentTransactions pt
+    JOIN BookReservations br ON pt.reservation_id = br.reservation_id
+    JOIN Students s ON br.student_id = s.student_id
+    JOIN Books b ON br.book_id = b.book_id
+    LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+    LEFT JOIN Grades g ON s.grade_id = g.grade_id
+    WHERE DATE(pt.payment_date) = '$today'
+      AND br.deleted_at IS NULL
+    ORDER BY pt.payment_date DESC
+");
+while ($row = $result->fetch_assoc()) $payment_updates[] = $row;
 ?>
+
 
 
 <!DOCTYPE html>
@@ -154,8 +181,16 @@ while ($row = $result->fetch_assoc()) {
     </style>
 </head>
 
-<body
-    x-data="{ page: 'saas', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+<body 
+    x-data="{ 
+        page: 'saas', 
+        loaded: true, 
+        darkMode: false, 
+        stickyMenu: false, 
+        sidebarToggle: false, 
+        scrollTop: false,
+        isTaskModalModal: false  <!-- أضف هذا -->
+    }"
     x-init="darkMode = JSON.parse(localStorage.getItem('darkMode')); $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
     :class="{'dark bg-gray-900': darkMode === true}">
     <div x-show="loaded" x-transition.opacity
@@ -396,159 +431,311 @@ while ($row = $result->fetch_assoc()) {
                         </article>
                     </div>
 
-                    <div
-                        class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                        <div class="px-6 py-4">
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90"></h3>
-                            <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400 justify-between">
-                                السجل اليومي
-                                <span
-                                    class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium"><?= date('Y-m-d') ?></span>
-                            </p>
-                        </div>
-                        <div class="custom-scrollbar overflow-x-auto">
-                            <table class="min-w-full">
-                                <thead>
-                                    <tr class="bg-gray-50 dark:bg-gray-900">
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            رقم الطلب</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            اسم الطالب</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            رقم الهاتف</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            المدرس</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            اسم الكتاب</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            السعر</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            الكمية</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            الإجمالي</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            المدفوع</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            المتبقي</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            وقت الحجز</th>
-                                        <th
-                                            class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            الحالة</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-                                    <?php foreach ($daily_records as $record): ?>
-                                        <tr>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= htmlspecialchars($record['order_number'] ?? '') ?>
-                                            </td>
-                                            <td class="px-6 py-3 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <div class="flex items-center gap-3">
-                                                        <div
-                                                            class="flex items-center justify-center w-10 h-10 rounded-full bg-brand-100">
-                                                            <span class="text-xs font-semibold text-brand-500">
-                                                                <?= htmlspecialchars($record['reservation_id'] ?? '') ?>
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <span
-                                                                class="text-theme-sm mb-0.5 block font-medium text-gray-700 dark:text-gray-400">
-                                                                <?= htmlspecialchars($record['student_name'] ?? '') ?>
-                                                            </span>
-                                                            <span class="text-gray-500 text-theme-sm dark:text-gray-400">
-                                                                <?= htmlspecialchars($record['grade_name'] ?? 'غير محدد') ?>
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-    <?php
-    $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
-    if (!empty($phone)) {
-        $phoneWithCode = '20' . $phone;
-        echo '<a href="https://wa.me/' . $phoneWithCode . '" target="_blank">' . htmlspecialchars($record['student_phone'] ?? 'غير متوفر') . '</a>';
-    } else {
-        echo 'غير متوفر';
-    }
-    ?>
-</td>
+        <div class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div class="px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90"></h3>
+        <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400 justify-between ">
+            السجل اليومي
+            <span class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium"><?= date('Y-m-d') ?></span>
+            
+            <div class="flex items-center gap-4 mt-3">
+      <div class="relative">
+    <input type="text" id="searchInput" placeholder="ابحث برقم الطلب أو الاسم أو الهاتف" 
+class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-10 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pr-4 pl-[42px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden xl:w-[300px] dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
+    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+        <i class="bi bi-search text-gray-400"></i>
+    </div>
+</div>
 
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= htmlspecialchars($record['teacher_name'] ?? 'غير محدد') ?>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= htmlspecialchars($record['book_title'] ?? '') ?>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= number_format($record['book_price'] ?? 0, 2) ?> <sub
-                                                    style="font-size: x-small;">EG</sub>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= htmlspecialchars($record['quantity'] ?? 1) ?>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= number_format(($record['book_price'] ?? 0) * ($record['quantity'] ?? 1), 2) ?>
-                                                <sub style="font-size: x-small;">EG</sub>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= number_format($record['amount_paid'] ?? 0, 2) ?> <sub
-                                                    style="font-size: x-small;">EG</sub>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= number_format($record['amount_due'] ?? 0, 2) ?> <sub
-                                                    style="font-size: x-small;">EG</sub>
-                                            </td>
-                                            <td
-                                                class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
-                                                <?= isset($record['created_at']) ? date('h:i A', strtotime($record['created_at'])) : '' ?>
-                                            </td>
-                                            <td class="px-6 py-4 text-left">
-                                                <?php
-                                                $status = $record['status'] ?? 'pending';
-                                                $status_class = 'bg-gray-50 text-gray-600 dark:bg-gray-500/15 dark:text-gray-500';
+                <button @click="isTaskModalModal = true" class="text-theme-sm shadow-theme-xs inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                    المدفوعات
+                </button>
+            </div>
+        </p>
+    </div>
 
-                                                if ($status == 'approved') {
-                                                    $status_class = 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500';
-                                                } elseif ($status == 'pending') {
-                                                    $status_class = 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500';
-                                                } elseif ($status == 'cancelled') {
-                                                    $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
-                                                } elseif ($status == 'returned') {
-                                                    $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
-                                                }
-                                                ?>
-                                                <span
-                                                    class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium"><?= htmlspecialchars($status) ?></span>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+    <div x-show="isTaskModalModal" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+        class="fixed inset-0 flex items-center justify-center p-5 overflow-y-auto z-99999"
+        :class="{'hidden': !isTaskModalModal}">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
+            @click="isTaskModalModal = false"></div>
+
+        <div @click.outside="isTaskModalModal = false"
+            class="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-11">
+
+            <div class="px-2">
+                <h4 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
+                    سجل تحديثات المدفوعات</h4>
+                <p class="flex items-center gap-3 text-gray-500 dark:text-gray-400 justify-between">
+                    التعديلات على المدفوعات اليومية
+                    <span class="bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-medium">
+                        <?php echo date('Y-m-d'); ?>
+                    </span>
+                </p>
+            </div>
+
+            <div class="mt-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="px-6 py-4"></div>
+                <div class="custom-scrollbar overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="bg-gray-50 dark:bg-gray-900">
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">#</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">رقم الطلب</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">اسم الطالب</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">رقم الهاتف</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المدرس</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">اسم الكتاب</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">السعر</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">الكمية</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">الإجمالي</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المدفوع</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المتبقي</th>
+                                <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">وقت التحديث</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                            <?php 
+                            $i = 1;
+                            $hasUpdates = false;
+                            
+                            $query = $mysqli->query("
+                                SELECT 
+                                    br.reservation_id,
+                                    br.order_number,
+                                    s.name AS student_name,
+                                    s.phone AS student_phone,
+                                    g.name AS grade_name,
+                                    t.name AS teacher_name,
+                                    t.phone AS teacher_phone,
+                                    b.title AS book_title,
+                                    b.price AS book_price,
+                                    br.quantity,
+                                    br.amount_paid,
+                                    (b.price * br.quantity) AS total_amount,
+                                    (b.price * br.quantity - br.amount_paid) AS remaining_amount,
+                                    br.updated_at,
+                                    br.created_at
+                                FROM BookReservations br
+                                JOIN Students s ON br.student_id = s.student_id
+                                JOIN Books b ON br.book_id = b.book_id
+                                LEFT JOIN Teachers t ON b.teacher_id = t.teacher_id
+                                LEFT JOIN Grades g ON s.grade_id = g.grade_id
+                                WHERE DATE(br.updated_at) = '$today' 
+                                  AND br.amount_paid > 0 
+                                  AND br.deleted_at IS NULL
+                                  AND br.updated_at != br.created_at
+                                ORDER BY br.updated_at DESC
+                            ");
+                            
+                            while ($record = $query->fetch_assoc()) {
+                                $hasUpdates = true;
+                                $total = $record['book_price'] * $record['quantity'];
+                                $remaining = $total - $record['amount_paid'];
+                            ?>
+                            <tr>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo $i++; ?>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo htmlspecialchars($record['order_number']); ?>
+                                </td>
+                                <td class="px-6 py-3 whitespace-nowrap">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center justify-center w-10 h-10 rounded-full bg-brand-100">
+                                            <span class="text-xs font-semibold text-brand-500">
+                                                <?php echo substr($record['student_name'], 0, 1); ?>
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span class="text-theme-sm block font-medium text-gray-700 dark:text-gray-400">
+                                                <?php echo htmlspecialchars($record['student_name']); ?>
+                                            </span>
+                                            <span class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                                <?php echo htmlspecialchars($record['grade_name'] ?? 'غير محدد'); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php 
+                                    $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+                                    if (!empty($phone)) {
+                                        $phoneWithCode = '20' . $phone;
+                                        echo '<a href="https://wa.me/'.$phoneWithCode.'" target="_blank" class="hover:text-brand-500">'. 
+                                             htmlspecialchars($record['student_phone']) . '</a>';
+                                    } else {
+                                        echo 'غير متوفر';
+                                    }
+                                    ?>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo htmlspecialchars($record['teacher_name'] ?? 'غير محدد'); ?>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo htmlspecialchars($record['book_title']); ?>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo number_format($record['book_price'], 2); ?> <sub class="text-xs">EG</sub>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo htmlspecialchars($record['quantity']); ?>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo number_format($total, 2); ?> <sub class="text-xs">EG</sub>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo number_format($record['amount_paid'], 2); ?> <sub class="text-xs">EG</sub>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo number_format($remaining, 2); ?> <sub class="text-xs">EG</sub>
+                                </td>
+                                <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                    <?php echo date('h:i A', strtotime($record['updated_at'])); ?>
+                                </td>
+                            </tr>
+                            <?php 
+                            }
+                            
+                            if (!$hasUpdates) {
+                            ?>
+                            <tr>
+                                <td colspan="12" class="px-6 py-4 text-center text-sm text-gray-700 dark:text-gray-400">
+                                    لا توجد تحديثات على المدفوعات اليوم.
+                                </td>
+                            </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
                 </div>
+            </div>    
+        </div>
+    </div>
+
+    <div class="custom-scrollbar overflow-x-auto">
+        <table class="min-w-full">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-900">
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">رقم الطلب</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">اسم الطالب</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">رقم الهاتف</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المدرس</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">اسم الكتاب</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">السعر</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">الكمية</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">الإجمالي</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المدفوع</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">المتبقي</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">وقت الحجز</th>
+                    <th class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">الحالة</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                <?php foreach ($daily_records as $record): ?>
+                    <tr>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= htmlspecialchars($record['order_number'] ?? '') ?>
+                        </td>
+                        <td class="px-6 py-3 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-full bg-brand-100">
+                                        <span class="text-xs font-semibold text-brand-500">
+                                            <?= htmlspecialchars($record['reservation_id'] ?? '') ?>
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span class="text-theme-sm mb-0.5 block font-medium text-gray-700 dark:text-gray-400">
+                                            <?= htmlspecialchars($record['student_name'] ?? '') ?>
+                                        </span>
+                                        <span class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                            <?= htmlspecialchars($record['grade_name'] ?? 'غير محدد') ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?php
+                            $phone = preg_replace('/\D/', '', $record['student_phone'] ?? '');
+                            if (!empty($phone)) {
+                                $phoneWithCode = '20' . $phone;
+                                echo '<a href="https://wa.me/' . $phoneWithCode . '" target="_blank">' . htmlspecialchars($record['student_phone'] ?? 'غير متوفر') . '</a>';
+                            } else {
+                                echo 'غير متوفر';
+                            }
+                            ?>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= htmlspecialchars($record['teacher_name'] ?? 'غير محدد') ?>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= htmlspecialchars($record['book_title'] ?? '') ?>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= number_format($record['book_price'] ?? 0, 2) ?> <sub style="font-size: x-small;">EG</sub>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= htmlspecialchars($record['quantity'] ?? 1) ?>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= number_format(($record['book_price'] ?? 0) * ($record['quantity'] ?? 1), 2) ?>
+                            <sub style="font-size: x-small;">EG</sub>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= number_format($record['amount_paid'] ?? 0, 2) ?> <sub style="font-size: x-small;">EG</sub>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= number_format($record['amount_due'] ?? 0, 2) ?> <sub style="font-size: x-small;">EG</sub>
+                        </td>
+                        <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                            <?= isset($record['created_at']) ? date('h:i A', strtotime($record['created_at'])) : '' ?>
+                        </td>
+                        <td class="px-6 py-4 text-left">
+                            <?php
+                            $status = $record['status'] ?? 'pending';
+                            $status_class = 'bg-gray-50 text-gray-600 dark:bg-gray-500/15 dark:text-gray-500';
+
+                            if ($status == 'approved') {
+                                $status_class = 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500';
+                            } elseif ($status == 'pending') {
+                                $status_class = 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500';
+                            } elseif ($status == 'cancelled') {
+                                $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
+                            } elseif ($status == 'returned') {
+                                $status_class = 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500';
+                            }
+                            ?>
+                            <span class="text-theme-xs <?= $status_class ?> rounded-full px-2 py-0.5 font-medium"><?= htmlspecialchars($status) ?></span>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const searchValue = this.value.toLowerCase();
+    const rows = document.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchValue)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+</script>
+                    
+                    
+            </div>
             </main>
 
             <script defer src="./assets/js/bundle.js"></script>
